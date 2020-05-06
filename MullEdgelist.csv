@@ -1,0 +1,68 @@
+ICTV Strain,Virus Genotype,Rodent Host,GenomeS,GenomeM,GenomeL,Virus Isolation
+Andes virus,Andes virus,Oligoryzomys longicaudatus,X,X,,X
+Andes virus,Andes virus,Oligoryzomys chacoensis,X,X,,
+Andes virus,Andes virus,Oligoryzomys flavescens,X,X,,
+Andes virus,Andes virus,Abrothrix longipilis,X,,,
+Andes virus,Andes virus,Loxodontomys micopus,X,,,
+Andes virus,Andes virus,Rattus rattus,X,,,
+Andes virus,Araraquara virus,Bolomys lasiurus,X,X,,
+Andes virus,Araraquara virus,Oxymycterus judex,X,X,,
+Andes virus,Araraquara virus,Akodon montensis,,X,,
+Andes virus,Juquitiba virus,Oligoryzomys fornesi,X,X,,
+Andes virus,Juquitiba virus,Oxymycterus nasutus,X,X,,
+Andes virus,Juquitiba virus,Oligoryzomys nigripes,X,X,,
+Andes virus,Maciel virus,Bolomys obscurus,,X,,
+Andes virus,Pergamino virus,Akodon azarae,X,X,,
+Andes virus,Pergamino virus,Oxymycterus rufus,X,,,
+Andes virus,Tunari virus,NA,,,,
+Castelo dos Sonhos virus,Castelo dos Sonhos virus,Oligoryzomys uriaritensis,X,,,
+Lechiguanas virus,Lechiguanas virus,Oligoryzomys flavescens,,X,,
+Lechiguanas virus,Lechiguanas virus,Oligoryzomys nigripes,X,X,,
+Lechiguanas virus,Bermejo virus,Oligoryzomys chacoensis,,X,,
+Oran virus,Oran virus,Oligoryzomys longicaudatus,,X,,
+Bayou virus,Bayou virus,Oryzomys palustris,X,X,,X
+Catacamas virus,Catacamas virus,Oryzomys couesi,X,X,,X
+Catacamas virus,Playa de Oro virus,Oryzomys couesi,X,X,,
+Catacamas virus,Playa de Oro virus,Sigmodon mascotensis,X,X,,
+Black Creek Canal virus,Black Creek Canal virus,Sigmodon hispidus,X,X,X,X
+Black Creek Canal virus,Muleshoe virus,Sigmodon hispidus,X,X,,
+Cano Delgadito virus,Cano Delgadito virus,Sigmodon alstoni,X,X,,X
+Choclo virus,Choclo virus,Oligoryzomys fulvescens (costaricensis),X,X,,
+Choclo virus,Jabora virus,Akodon montensis,X,,,
+Carrizal virus,Carrizal virus,Reithrodontomys sumichrasti,X,X,X,
+El Moro Canyon virus,El Moro Canyon virus,Reithrodontomys megalotis,X,X,,
+El Moro Canyon virus,El Moro Canyon virus,Reithrodontomys sumichrasti,X,X,,
+El Moro Canyon virus,El Moro Canyon virus,Neotoma mexicana,X,,,
+El Moro Canyon virus,Rio Segundo virus,Reithrodontomys mexicanus,X,,,
+Huitzilac virus,Huitzilac virus,Reithrodontomys megalotis,X,X,X,
+Laguna Negra virus,Laguna Negra virus,Calomys laucha,X,X,,X
+Maripa virus,Maripa virus,Oligoryzomys fulvescens,X,X,,
+Maripa virus,Maripa virus,Zygodontomys brevicauda,X,X,,
+Rio Mamore virus,Rio Mamore virus,Oligoryzomys microtis,X,X,,X
+Rio Mamore virus,Anajatuba virus,Oligoryzomys fornesi,X,,,
+Rio Mamore virus,Rio Mearim virus,Holochilus sciureus,X,,,
+Maporal virus,Maporal virus,Oligoryzomys fulvescens (delicatus),X,X,,X
+Montano virus,Montano virus,Peromyscus beatae,X,X,X,
+Necocli virus,Necocli virus,Zygodontomys brevicauda (cherriei),X,X,,
+Necocli virus,Calabazo virus,Zygodontomys brevicauda (cherriei),X,X,,
+Prospect Hill virus,Prospect Hill virus,Microtus pennsylvanicus,,,,X
+Prospect Hill virus,Isla Vista virus,Microtus californicus,X,X,,
+Prospect Hill virus,Isla Vista virus,Peromyscus californicus,X,X,,
+Prospect Hill virus,Bloodland Lake virus,Microtus ochrogaster,X,,,
+New York virus,New York virus,Peromyscus leucopus,X,X,,X
+New York virus,Monongahela virus,Peromyscus maniculatus nubiterrae,X,X,,
+New York virus,Monongahela virus,Peromyscus leucopus,X,X,,
+New York virus,Blue River virus,Peromyscus leucopus,,X,,
+Sin Nombre virus,Sin Nombre virus,Peromyscus maniculatus,X,X,,X
+Sin Nombre virus,Sin Nombre virus,Peromyscus californicus,X,X,,
+Sin Nombre virus,Sin Nombre virus,Peromyscus attwateri,X,X,,
+Sin Nombre virus,Sin Nombre virus,Peromyscus eremicus,X,,,
+Sin Nombre virus,Sin Nombre virus,Peromyscus laceianus,X,X,,
+Sin Nombre virus,Sin Nombre virus,Reithrodontomys fulvescens,X,X,,
+Sin Nombre virus,Limestone Canyon virus,Peromyscus boylii,X,X,,
+Sin Nombre virus,Limestone Canyon virus,Peromyscus hylocetes,X,X,,
+Sin Nombre virus,Limestone Canyon virus,Peromyscus leucopus,X,X,,
+Sin Nombre virus,Limestone Canyon virus,Peromyscus levipes,X,X,,
+Sin Nombre virus,Limestone Canyon virus,Peromyscus melanotis,X,X,,
+Sin Nombre virus,Limestone Canyon virus,Peromyscus ochraventer,X,X,,
+Sin Nombre virus,Limestone Canyon virus,Peromyscus spicilegus,X,X,,
