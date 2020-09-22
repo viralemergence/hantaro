@@ -1,5 +1,5 @@
-## rodent hantavirus cleaning
-## danbeck@iu.edu
+## hantaro 01: rodent hantavirus cleaning
+## danbeck@ou.edu
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -8,12 +8,9 @@ graphics.off()
 ## libraries
 library(ape)
 library(plyr)
-library(caper)
-library(phylofactor)
-library(data.table)
 
 ## load in hantavirus data
-setwd("~/Desktop/massinnombres/data")
+setwd("~/Desktop/hantaro/data/raw")
 hdata=read.csv("Muroid Taxonomy and Traits with Hantavirus Evidence.csv",header=T)
 
 ## synonym IUCN
@@ -34,7 +31,7 @@ rm(trim,start,end)
 traits=traits[!duplicated(traits$Rodents),]
 
 ## load Upham phylogeny
-setwd("~/Desktop/massinnombres/phylo")
+setwd("~/Desktop/hantaro/phylo")
 tree=read.nexus('MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre')
 
 ## load in taxonomy
@@ -95,15 +92,15 @@ miss=miss[miss$intree=='missing' | miss$intraits=='missing',]
 miss=miss[order(miss$intree,miss$intraits),]
 
 ## export
-setwd("~/Desktop/massinnombres/data")
+setwd("~/Desktop/hantaro/data/names")
 write.csv(miss,'hantaro name mismatch.csv')
 rm(miss)
 
-## load in revised names
-fix=read.csv('hantaro name mismatch_edit.csv',header=T)
+## load in revised names with Than edits
+fix=read.csv('hantaro name mismatch_edit_TM.csv',header=T)
 
 ## merge
-fix=fix[c('tip','treename','traitname')]
+fix=fix[c('tip','treename','traitname','proxy')]
 data=merge(data,fix,by='tip',all.x=T)
 
 ## if blank, NA
@@ -111,14 +108,23 @@ data$traitname=ifelse(data$traitname=='',NA,as.character(data$traitname))
 data$treename=ifelse(data$treename=='',NA,as.character(data$treename))
 
 ## if NA, tip
-data$traitname=ifelse(is.na(data$traitname),as.character(data$tip),as.character(data$traitname))
 data$treename=ifelse(is.na(data$treename),as.character(data$tip),as.character(data$treename))
+
+## trait name includes proxy
+#data$traitname=ifelse(is.na(data$traitname),as.character(data$tip),as.character(data$traitname))
+data$traitname=ifelse(data$intraits=='missing' & is.na(data$traitname),as.character(data$proxy),
+                 ifelse(data$intraits=='missing' & !is.na(data$traitname),as.character(data$traitname),
+                        as.character(data$tip)))
 
 ## simplify
 data=data[c('tip','studies','hPCR','competence','gen','fam','treename','traitname')]
+rm(fix)
 
 ## fix duplicates in phylogeny
 set=data[c('studies','hPCR','competence','treename')]
+
+## which treenames occur multiple times
+unique(set$treename)[table(set$treename)>1]
 
 ## aggregate
 set=aggregate(.~treename,set,sum)
@@ -128,7 +134,7 @@ set2=merge(set,data[!duplicated(data$treename),c('tip','gen','fam','treename','t
 
 ## simplify
 data=set2
-rm(set,set2,fix)
+rm(set,set2)
 
 ## fix binomial
 data$hPCR=ifelse(data$hPCR>0,1,0)
@@ -140,18 +146,13 @@ traits$trait=1
 data=merge(data,traits,by='traitname',all.x=T)
 rm(traits)
 
-## setdiff
-data$tree=ifelse(data$treename%in%setdiff(data$treename,tree$tip),'cut','keep')
-
-## trim
-bdata=data[-which(data$tree=='cut'),]
-
 ## fix tree
 rtree=tree
 rtree$tip.label=rtree$tip
 
 ## trim
-rtree=keep.tip(rtree,bdata$treename)
+#rtree=keep.tip(rtree,data$treename)
+rtree=keep.tip(rtree,rtree$tip.label[rtree$tip.label%in%data$treename])
 
 ## fix
 rtree$tip=NULL
@@ -159,162 +160,26 @@ rtree$tip=NULL
 ## fix
 rtree=makeLabel(rtree)
 
-## match
-bdata=bdata[match(rtree$tip.label,bdata$treename),]
+## get ed
+library(picante)
+ed=evol.distinct(rtree,type='equal.splits')
 
-## save
-bdata$label=bdata$treename
-bdata$Species=bdata$treename
+## treename
+ed$treename=ed$Species
+ed$Species=NULL
 
-## merge
-cdata=comparative.data(phy=rtree,data=bdata,names.col=treename,vcv=T,na.omit=F,warn.dropped=T)
+## rename
+ed$ed_equal=ed$w
+ed$w=NULL
 
-## fix
-cdata$data$tree=NULL
+## merge into data
+data=merge(data,ed,by='treename',all.x=T)
+rm(ed)
 
-## taxonomy
-cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
+## cleaning
+data$trait=NULL
 
-## set taxonomy
-taxonomy=data.frame(cdata$data$taxonomy)
-names(taxonomy)="taxonomy"
-taxonomy$Species=rownames(cdata$data)
-taxonomy=taxonomy[c("Species","taxonomy")]
-taxonomy$taxonomy=as.character(taxonomy$taxonomy)
-
-## Holm rejection procedure
-HolmProcedure <- function(pf,FWER=0.05){
-  
-  ## get split variable
-  cs=names(coef(pf$models[[1]]))[-1]
-  split=ifelse(length(cs)>1,cs[3],cs[1])
-  
-  ## obtain p values
-  if (pf$models[[1]]$family$family%in%c('gaussian',"Gamma","quasipoisson")){
-    pvals <- sapply(pf$models,FUN=function(fit) summary(fit)$coefficients[split,'Pr(>|t|)'])
-  } else {
-    pvals <- sapply(pf$models,FUN=function(fit) summary(fit)$coefficients[split,'Pr(>|z|)'])
-  }
-  D <- length(pf$tree$tip.label)
-  
-  ## this is the line for Holm's sequentially rejective cutoff
-  keepers <- pvals<=(FWER/(2*D-3 - 2*(0:(pf$nfactors-1))))
-  
-  
-  if (!all(keepers)){
-    nfactors <- min(which(!keepers))-1
-  } else {
-    nfactors <- pf$nfactors
-  }
-  return(nfactors)
-}
-
-## get species in a clade
-cladeget=function(pf,factor){
-  spp=pf$tree$tip.label[pf$groups[[factor]][[1]]]
-  return(spp)
-}
-
-## summarize pf object 
-pfsum=function(pf){
-  
-  ## get formula
-  chars=as.character(pf$frmla.phylo)[-1]
-  
-  ## response
-  resp=chars[1]
-  
-  ## fix
-  resp=ifelse(resp=='cbind(pos, neg)','prevalence',resp)
-  
-  ## holm
-  hp=HolmProcedure(pf)
-  
-  ## save model
-  model=chars[2]
-  
-  ## set key
-  setkey(pf$Data,'Species')
-  
-  ## make data
-  dat=data.frame(pf$Data)
-  
-  ## make clade columns in data
-  for(i in 1:hp){
-    
-    dat[,paste0(resp,'_pf',i)]=ifelse(dat$genus%in%cladeget(pf,i),'factor','other')
-    
-  }
-  
-  ## make data frame to store taxa name, response, mean, and other
-  results=data.frame(matrix(ncol=6, nrow = hp))
-  colnames(results)=c('factor','taxa','tips','node',"clade",'other')
-  
-  ## set taxonomy
-  taxonomy=dat[c('Species','taxonomy')]
-  taxonomy$taxonomy=as.character(taxonomy$taxonomy)
-  
-  ## loop
-  for(i in 1:hp){
-    
-    ## get taxa
-    tx=pf.taxa(pf,taxonomy,factor=i)$group1
-    
-    ## get tail
-    tx=sapply(strsplit(tx,'; '),function(x) tail(x,1))
-    
-    ## combine
-    tx=paste(tx,collapse=', ')
-    
-    # save
-    results[i,'factor']=i
-    results[i,'taxa']=tx
-    
-    ## get node
-    tips=cladeget(pf,i)
-    node=ggtree::MRCA(pf$tree,tips)
-    results[i,'tips']=length(tips)
-    results[i,'node']=ifelse(is.null(node) & length(tips)==1,'species',
-                             ifelse(is.null(node) & length(tips)!=1,NA,node))
-    
-    ## get means
-    ms=(tapply(dat[,resp],dat[,paste0(resp,'_pf',i)],mean))
-    
-    ## add in
-    results[i,'clade']=ms['factor']
-    results[i,'other']=ms['other']
-    
-  }
-  
-  ## return
-  return(list(set=dat,results=results))
-}
-
-## fix palette
-AlberPalettes <- c("YlGnBu","Reds","BuPu", "PiYG")
-AlberColours <- sapply(AlberPalettes, function(a) RColorBrewer::brewer.pal(5, a)[4])
-afun=function(x){
-  a=AlberColours[1:x]
-  return(a)
-}
-
-## make low and high
-pcols=afun(2)
-
-## PCR
-set.seed(1)
-pcr_pf=gpf(Data=cdata$data,tree=cdata$phy,
-        frmla.phylo=hPCR~phylo,
-        family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
-
-## summarize
-pcr_pf_results=pfsum(pcr_pf)$results
-
-## competence
-set.seed(1)
-hc_pf=gpf(Data=cdata$data,tree=cdata$phy,
-           frmla.phylo=competence~phylo,
-           family=binomial,algorithm='phylo',nfactors=5,min.group.size=1)
-
-## summarize
-hc_pf_results=pfsum(hc_pf)$results
+## export files
+setwd("~/Desktop/hantaro/data/clean files")
+write.csv(data,'hantaro cleaned response and traits.csv')
+saveRDS(rtree,'rodent phylo trim.rds')
