@@ -179,6 +179,31 @@ rm(ed)
 ## cleaning
 data$trait=NULL
 
+## pubmed citations
+library(easyPubMed)
+
+## function
+counter=function(name){
+  as.numeric(as.character(get_pubmed_ids(gsub('_','-',name))$Count))
+}
+citations=c()
+
+## loop through
+for(i in 1:length(data$treename)) {
+  citations[i]=counter(data$treename[i])
+  print(i)
+}
+
+## compile
+cites=data.frame(treename=data$treename,
+                 cites=citations)
+
+## merge
+data=merge(data,cites,by='treename')
+
+## clean
+rm(cites,citations,i,counter)
+
 ## export files
 setwd("~/Desktop/hantaro/data/clean files")
 write.csv(data,'hantaro cleaned response and traits.csv')

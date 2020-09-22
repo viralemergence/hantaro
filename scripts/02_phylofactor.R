@@ -175,7 +175,7 @@ pcols=afun(2)
 set.seed(1)
 pcr_pf=gpf(Data=cdata$data,tree=cdata$phy,
            frmla.phylo=hPCR~phylo,
-           family=binomial,algorithm='phylo',nfactors=5,min.group.size=1)
+           family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
 
 ## summarize
 pcr_pf_results=pfsum(pcr_pf)$results
@@ -184,7 +184,7 @@ pcr_pf_results=pfsum(pcr_pf)$results
 set.seed(1)
 hc_pf=gpf(Data=cdata$data,tree=cdata$phy,
           frmla.phylo=competence~phylo,
-          family=binomial,algorithm='phylo',nfactors=5,min.group.size=1)
+          family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
 
 ## summarize
 hc_pf_results=pfsum(hc_pf)$results
