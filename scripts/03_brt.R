@@ -506,6 +506,7 @@ ggplot(apreds2,aes(PCR,competence))+geom_point()+
   geom_smooth(method='gam')+
   labs(x='PCR-based predictions',
        y='competence-based predictions')
+cor(apreds2$PCR,apreds2$competence,method='spearman')
 
 ## vis
 ggplot(apreds,aes(pred,cpred,colour=factor(hPCR)))+geom_point()
@@ -513,6 +514,7 @@ ggplot(apreds,aes(pred,cpred,colour=factor(hPCR)))+geom_point()
 ## density
 ggplot(apreds,aes(cpred))+
   geom_density(aes(colour=factor(hPCR),fill=factor(hPCR)),alpha=0.5)+
+  facet_wrap(~type)+
   xlim(0,1)+
   labs(x=expression(paste("mean predicted probability of infection")))+
   theme_bw()+
@@ -539,11 +541,11 @@ setwd("~/Desktop/hantaro/data/clean files")
 rtree=readRDS('rodent phylo trim.rds')
 
 ## setdiff
-apreds$tree=ifelse(apreds$treename%in%setdiff(apreds$treename,rtree$tip.label),'cut','keep')
-table(apreds$tree)
+apreds2$tree=ifelse(apreds2$treename%in%setdiff(apreds2$treename,rtree$tip.label),'cut','keep')
+table(apreds2$tree)
 
 ## trim
-bdata=apreds[-which(apreds$tree=='cut'),]
+bdata=apreds2[-which(apreds2$tree=='cut'),]
 
 ## match
 bdata=bdata[match(rtree$tip.label,bdata$treename),]
@@ -559,10 +561,25 @@ cdata=comparative.data(phy=rtree,data=bdata,names.col=treename,vcv=T,na.omit=F,w
 cdata$data$tree=NULL
 
 ## logit
-cdata$data$logit_cpred=car::logit(cdata$data$cpred)
-lmod=pgls(logit_cpred~1,data=cdata,lambda="ML")
-summary(lmod)
+cdata$data$logit_PCR=car::logit(cdata$data$PCR)
+cdata$data$logit_comp=car::logit(cdata$data$competence)
+
+## lambda
+pcr_lmod=pgls(logit_PCR~1,data=cdata,lambda="ML")
+comp_lmod=pgls(logit_comp~1,data=cdata,lambda="ML")
+summary(pcr_lmod)
+summary(comp_lmod)
 ## moderate phylogenetic signal in predictions
+
+## relate prediction
+lmod=pgls(competence~PCR,data=cdata,lambda="ML")
+summary(lmod)
+lmod=pgls(logit_comp~logit_PCR,data=cdata,lambda="ML")
+summary(lmod)
+ggplot(cdata$data,aes(logit_PCR,logit_comp))+geom_point()+
+  geom_smooth(method='lm')+
+  labs(x='PCR-based predictions',
+       y='competence-based predictions')
 
 ## taxonomy
 cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
@@ -696,7 +713,7 @@ pcols=afun(2)
 ## predictions
 set.seed(1)
 pred_pf=gpf(Data=cdata$data,tree=cdata$phy,
-           frmla.phylo=cpred~phylo,
+           frmla.phylo=competence~phylo,
            family=gaussian,algorithm='phylo',nfactors=5,min.group.size=5)
 
 ## summarize
