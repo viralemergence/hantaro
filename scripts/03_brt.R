@@ -25,6 +25,9 @@ library(treeio)
 setwd("~/Desktop/hantaro/data/clean files")
 data=read.csv('hantaro cleaned response and traits.csv')
 
+## classify true negatives
+data$type=ifelse(data$studies>0 & data$hPCR==0 & data$competence==0,"true negative","other")
+
 ## mode function
 mode.prop <- function(x) {
   ux <- unique(x[is.na(x)==FALSE])
@@ -60,7 +63,7 @@ mval=data.frame(apply(data,2,function(x) length(x[!is.na(x)])/nrow(data)))
 mval$variables=rownames(mval)
 names(mval)=c("comp","column")
 
-## if missing 25% or more
+## if have at least 25% values, keep
 mval$comp=round(mval$comp,2)
 mval$keep=ifelse(mval$comp>=0.25,"keep","cut")
 mval=mval[order(mval$keep),]
@@ -78,6 +81,14 @@ dums=dummy_cols(data["gen"])
 
 ## unique
 dums=dums[!duplicated(dums$gen),]
+
+## ensure all factor
+for(i in 1:ncol(dums)){
+  
+  ## column as factor
+  dums[,i]=factor(dums[,i])
+  
+}
 
 ## merge
 data=merge(data,dums,by="gen",all.x=T)
@@ -105,6 +116,7 @@ set$X12.2_Terrestriality=factor(set$X12.2_Terrestriality)
 set$X6.2_TrophicLevel=factor(set$X6.2_TrophicLevel)
 set$gen=NULL
 set$fam=NULL
+set$type=NULL
 
 ## remove studies
 set$studies=NULL
@@ -140,7 +152,7 @@ brt_part=function(seed,response){
              n.trees=5000,
              distribution="bernoulli",
              shrinkage=0.001,
-             interaction.depth=4,
+             interaction.depth=3,
              n.minobsinnode=4,
              cv.folds=5,class.stratify.cv=TRUE,
              bag.fraction=0.5,train.fraction=1,
@@ -202,10 +214,51 @@ brt_part=function(seed,response){
               testdata=dataTest))
 }
 
-## apply across 10 splits
+## apply across 10 splits each
 smax=10
 pcr_brts=lapply(1:smax,function(x) brt_part(seed=x,response="hPCR"))
 comp_brts=lapply(1:smax,function(x) brt_part(seed=x,response="competence"))
+
+## write to files
+setwd("~/Desktop/hantaro/data/clean files")
+saveRDS(pcr_brts,"pcr brts.rds")
+saveRDS(comp_brts,"comp brts.rds")
+
+## average predictions: PCR
+pcr_apreds=lapply(pcr_brts,function(x) x$predict)
+pcr_apreds=do.call(rbind,pcr_apreds)
+
+## aggregate
+pcr_apreds=data.frame(aggregate(pred~treename,data=pcr_apreds,mean),
+                      aggregate(cpred~treename,data=pcr_apreds,mean)['cpred'],
+                      aggregate(hPCR~treename,data=pcr_apreds,prod)["hPCR"],
+                      aggregate(competence~treename,data=pcr_apreds,prod)["competence"])
+
+## type
+pcr_apreds$type='PCR'
+
+## average predictions: competence
+comp_apreds=lapply(comp_brts,function(x) x$predict)
+comp_apreds=do.call(rbind,comp_apreds)
+
+## aggregate
+comp_apreds=data.frame(aggregate(pred~treename,data=comp_apreds,mean),
+                       aggregate(cpred~treename,data=comp_apreds,mean)['cpred'],
+                       aggregate(hPCR~treename,data=comp_apreds,prod)["hPCR"],
+                       aggregate(competence~treename,data=comp_apreds,prod)["competence"])
+
+## type
+comp_apreds$type='competence'
+
+## apreds
+apreds=rbind.data.frame(pcr_apreds,comp_apreds)
+
+## long to wide
+apreds2=spread(apreds[c('treename','type','cpred')],type,cpred)
+comp_apreds$comp=comp_apreds$competence
+
+## merge
+apreds2=merge(apreds2,comp_apreds[c("treename","hPCR","comp")],by="treename")
 
 ## extract AUC and type
 adata=data.frame(auc=c(sapply(pcr_brts,function(x) x$testAUC),
@@ -220,30 +273,53 @@ t.test(auc~response,data=adata,
        alternative='two.sided',
        var.equal=F)                 
 
-## visualize
-ggplot(adata,aes(response,auc,colour=response))+
-  geom_boxplot()+
-  geom_jitter(width=0.1)+
-  guides(colour=F)+
-  theme_bw()
+## make color
+col=rgb(red=125,green=118,blue=170,max=255)
 
-## summarize AUC on test
-hist(sapply(brts,function(x) x$testAUC))
-mean(sapply(brts,function(x) x$testAUC))
-se(sapply(brts,function(x) x$testAUC))
+## visualize
+p1=ggplot(adata,aes(response,auc))+
+  geom_boxplot(width=0.5,alpha=0.25,colour=col,fill=col)+
+  geom_jitter(width=0.1,colour=col,size=3,alpha=1)+
+  scale_x_discrete(labels=c("infection","competence"))+
+  guides(colour=F)+
+  ylim(0.84,1)+
+  theme_bw()+
+  labs(x="response variable",
+       y="BRT AUC")+
+  theme(axis.text=element_text(size=10),
+        axis.text.x=element_text(size=12),
+        axis.title=element_text(size=12))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+  guides(colour=F,fill=F)
 
 ## check iterations of the tree
-max(sapply(brts,function(x) x$best))
-hist(sapply(brts,function(x) x$best),xlim=c(0,brts[[1]]$mod$n.trees))
-abline(v=brts[[1]]$mod$n.trees,col="red")
-table(sapply(brts,function(x) x$best)<brts[[1]]$mod$n.trees)
+table(sapply(pcr_brts,function(x) x$best)<pcr_brts[[1]]$mod$n.trees)
+table(sapply(comp_brts,function(x) x$best)<comp_brts[[1]]$mod$n.trees)
 
 ## aggregate ROCs
-rocs=lapply(brts,function(x) x$roc)
-rocs=do.call(rbind,rocs)
+rocs=lapply(pcr_brts,function(x) x$roc)
+pcr_rocs=do.call(rbind,rocs)
+
+## for comp
+rocs=lapply(comp_brts,function(x) x$roc)
+comp_rocs=do.call(rbind,rocs)
 
 ## plot
-ggplot(rocs,aes(fpr,tpr,group=seed))+
+ggplot(pcr_rocs,aes(fpr,tpr,group=seed))+
+  theme_bw()+
+  geom_line(size=1,alpha=0.5,colour="black")+
+  geom_abline(intercept=0,slope=1,size=0.15)+
+  
+  ## theme
+  labs(x="false positive rate",y="true positive rate")+
+  theme(axis.title=element_text(size=10),
+        axis.text=element_text(size=10))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=5,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=5,b=0,l=0)))
+ggplot(comp_rocs,aes(fpr,tpr,group=seed))+
   theme_bw()+
   geom_line(size=1,alpha=0.5,colour="black")+
   geom_abline(intercept=0,slope=1,size=0.15)+
@@ -257,51 +333,93 @@ ggplot(rocs,aes(fpr,tpr,group=seed))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=5,b=0,l=0)))
 
 ## variable importance
-vinf=lapply(brts,function(x) x$rinf)
-vinf=do.call(rbind,vinf)
+vinf=lapply(pcr_brts,function(x) x$rinf)
+pcr_vinf=do.call(rbind,vinf)
 
-## as percent
-vinf$rel.inf=vinf$rel.inf/100
+## comp
+vinf=lapply(comp_brts,function(x) x$rinf)
+comp_vinf=do.call(rbind,vinf)
 
 ## aggregate mean
-vdata=data.frame(aggregate(rel.inf~var,data=vinf,mean),
-                 aggregate(rel.inf~var,data=vinf,se)["rel.inf"])
-names(vdata)=c("var","rel.inf","rse")
-vdata=vdata[order(vdata$rel.inf,decreasing=T),]
+vdata_pcr=data.frame(aggregate(rel.inf~var,data=pcr_vinf,mean),
+                 aggregate(rel.inf~var,data=pcr_vinf,se)["rel.inf"])
+names(vdata_pcr)=c("var","rel.inf","rse")
+vdata_pcr=vdata_pcr[order(vdata_pcr$rel.inf,decreasing=T),]
 
-## make rmin and rmax
-vdata$rmin=vdata$rel.inf-vdata$rse
-vdata$rmax=vdata$rel.inf+vdata$rse
+## aggregate mean
+vdata_comp=data.frame(aggregate(rel.inf~var,data=comp_vinf,mean),
+                      aggregate(rel.inf~var,data=comp_vinf,se)["rel.inf"])
+names(vdata_comp)=c("var","rel.inf","rse")
+vdata_comp=vdata_comp[order(vdata_comp$rel.inf,decreasing=T),]
 
-## minimize
-vset=vdata[-which(round(vdata$rel.inf,3)<=0.01),]
+## type
+vdata_pcr$type="PCR"
+vdata_comp$type="competence"
 
-## vtops
-vtops=vset[order(vset$rel.inf,decreasing=T),]
+## rank
+vdata_pcr$pcr_rank=1:nrow(vdata_pcr)
+
+## comp
+vdata_comp$comp_rank=1:nrow(vdata_comp)
+
+## rel inf
+vdata_pcr$pcr_imp=vdata_pcr$rel.inf/100
+vdata_comp$comp_imp=vdata_comp$rel.inf/100
+
+## combine ranks
+ranks=merge(vdata_pcr[c("var","pcr_rank","pcr_imp")],
+            vdata_comp[c("var","comp_rank","comp_imp")],
+            by="var")
+
+## correlate
+cor.test(ranks$pcr_imp,ranks$comp_imp,method="spearman")
+
+## drop zero
+ranks=ranks[-which(ranks$pcr_imp<0.01 & ranks$comp_imp<0.01),]
+cor.test(ranks$pcr_imp,ranks$comp_imp,method="spearman")
 
 ## plot
-ggplot(vset,aes(reorder(var,rel.inf),rel.inf))+
-  geom_errorbar(aes(ymin=rmin,ymax=rmax),width=0)+
-  #scale_y_reverse()+
-  coord_flip()+
-  geom_point()+
-  scale_y_continuous(labels = scales::percent_format(accuracy=1))+
-  guides(colour=guide_legend(title="",override.aes=list(linetype=0)))+
-  
-  ## theme
+p2=ggplot(ranks,aes(pcr_rank,comp_rank))+
+  #geom_point()+
+  geom_label(aes(label=var),size=2,fill=col,alpha=0.2)+
+  scale_y_reverse(limits=c(max(c(ranks$comp_rank,ranks$pcr_rank))+3,0))+
+  scale_x_reverse(limits=c(max(c(ranks$comp_rank,ranks$pcr_rank))+3,0))+
+  #geom_abline(slope=1,linetype=2,size=0.5)+
   theme_bw()+
-  theme(legend.position="top")+
-  theme(axis.text=element_text(size=9),
-        #axis.text.x=element_text(angle=67.5,hjust=1),
-        axis.title=element_text(size=10),
-        legend.text=element_text(size=8),
-        legend.key.size = unit(0.5,"cm"),
-        legend.box.margin=margin(t=-2.5,r=0,b=-2.5,l=0),
-        legend.margin=margin(0,0,0,0))+
+  labs(x="feature rank for PCR",
+       y="feature rank for competence")+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
-  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
-  labs(x="",y="relative importance")
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))
+
+## combine
+library(patchwork)
+setwd("~/Desktop/rodent comp")
+png("model compare.png",width=7,height=3.5,units="in",res=300)
+p1+p2
+dev.off()
+
+## same for relative importance
+library(scales)
+ggplot(ranks,aes(pcr_imp,comp_imp))+
+  #geom_point()+
+  #geom_text_repel(aes(label=var),force=1)+
+  geom_label(aes(label=var),size=4,fill="grey90",alpha=0.7)+
+  #scale_x_sqrt()+
+  #scale_y_sqrt()+
+  scale_x_continuous(trans=modulus_trans(p=0.01,offset=1))+
+  scale_y_continuous(trans=modulus_trans(p=0.01,offset=1))+
+  geom_abline(intercept=0,slope=1,linetype=2)+
+  theme_bw()+
+  labs(x="relative importance for PCR BRTs",
+       y="relative importance for competence BRTs")+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))
 
 ## function for compiling across BRTs for a given predictor, all else equal
 pdp_agg=function(mod,feature){
@@ -454,20 +572,34 @@ pdp_plot=function(bmods,feature,feature2=NULL){
   
 }
 
-## plot the top features
-pdp_plot(brts,as.character(vtops$var[1]),as.character(vtops$var[1]))
-pdp_plot(brts,as.character(vtops$var[2]),as.character(vtops$var[2]))
-pdp_plot(brts,as.character(vtops$var[3]),as.character(vtops$var[3]))
-pdp_plot(brts,as.character(vtops$var[4]),as.character(vtops$var[4]))
-pdp_plot(brts,as.character(vtops$var[5]),as.character(vtops$var[5]))
-pdp_plot(brts,as.character(vtops$var[6]),as.character(vtops$var[6]))
-pdp_plot(brts,as.character(vtops$var[7]),as.character(vtops$var[7]))
-pdp_plot(brts,as.character(vtops$var[8]),as.character(vtops$var[8]))
-pdp_plot(brts,as.character(vtops$var[9]),as.character(vtops$var[9]))
-pdp_plot(brts,as.character(vtops$var[10]),as.character(vtops$var[10]))
-pdp_plot(brts,as.character(vtops$var[11]),as.character(vtops$var[11]))
-pdp_plot(brts,as.character(vtops$var[12]),as.character(vtops$var[12]))
-pdp_plot(brts,as.character(vtops$var[13]),as.character(vtops$var[13]))
+## sort ranks
+ranks=ranks[order(ranks$comp_rank,decreasing=F),]
+
+## compare function
+pcomp=function(x){
+
+  library(patchwork)
+  a=pdp_plot(pcr_brts,x,x)
+  a=a+labs(title="PCR")
+  b=pdp_plot(comp_brts,x,x)
+  b=b+labs(title="competence")
+  a+b
+}
+
+## run through
+pcomp(as.character(ranks$var)[1])
+pcomp(as.character(ranks$var)[2])
+pcomp(as.character(ranks$var)[3])
+pcomp(as.character(ranks$var)[4])
+pcomp(as.character(ranks$var)[5])
+pcomp(as.character(ranks$var)[6])
+pcomp(as.character(ranks$var)[7])
+pcomp(as.character(ranks$var)[8])
+pcomp(as.character(ranks$var)[9])
+pcomp(as.character(ranks$var)[10])
+pcomp(as.character(ranks$var)[11])
+pcomp(as.character(ranks$var)[12])
+pcomp(as.character(ranks$var)[13])
 
 ## average predictions: PCR
 pcr_apreds=lapply(pcr_brts,function(x) x$predict)
@@ -500,13 +632,28 @@ apreds=rbind.data.frame(pcr_apreds,comp_apreds)
 
 ## long to wide
 apreds2=spread(apreds[c('treename','type','cpred')],type,cpred)
+comp_apreds$comp=comp_apreds$competence
+
+## merge
+apreds2=merge(apreds2,comp_apreds[c("treename","hPCR","comp")],by="treename")
 
 ## compare
-ggplot(apreds2,aes(PCR,competence))+geom_point()+
-  geom_smooth(method='gam')+
-  labs(x='PCR-based predictions',
-       y='competence-based predictions')
+png("model pred.png",width=7,height=3.5,units="in",res=300)
+p3=ggplot(apreds2,aes(PCR,competence))+
+  geom_point(alpha=0.5,colour="black")+
+  geom_smooth(method='gam',colour=col)+
+  labs(x='predictions from PCR',
+       y='predictions from competence')+
+  theme_bw()+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))
+p3+p3
+dev.off()
 cor(apreds2$PCR,apreds2$competence,method='spearman')
+cor.test(apreds2$PCR,apreds2$competence,method='spearman')
 
 ## vis
 ggplot(apreds,aes(pred,cpred,colour=factor(hPCR)))+geom_point()
