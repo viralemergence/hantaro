@@ -10,6 +10,8 @@ library(ape)
 library(caper)
 library(phylofactor)
 library(data.table)
+library(treeio)
+library(ggtree)
 
 ## load files
 setwd("~/Desktop/hantaro/data/clean files")
@@ -160,6 +162,29 @@ pfsum=function(pf){
   return(list(set=dat,results=results))
 }
 
+## PCR
+set.seed(1)
+pcr_pf=gpf(Data=cdata$data,tree=cdata$phy,
+           frmla.phylo=hPCR~phylo,
+           family=binomial,algorithm='phylo',nfactors=3,min.group.size=5)
+
+## summarize
+pcr_pf_results=pfsum(pcr_pf)$results
+
+## competence
+set.seed(1)
+hc_pf=gpf(Data=cdata$data,tree=cdata$phy,
+          frmla.phylo=competence~phylo,
+          family=binomial,algorithm='phylo',nfactors=2,min.group.size=5)
+
+## summarize
+hc_pf_results=pfsum(hc_pf)$results
+
+## save tree
+cdata$data$infect=factor(cdata$data$hPCR)
+cdata$data$comp=factor(cdata$data$competence)
+dtree=treeio::full_join(as.treedata(cdata$phy),cdata$data,by="label")
+
 ## fix palette
 AlberPalettes <- c("YlGnBu","Reds","BuPu", "PiYG")
 AlberColours <- sapply(AlberPalettes, function(a) RColorBrewer::brewer.pal(5, a)[4])
@@ -171,23 +196,53 @@ afun=function(x){
 ## make low and high
 pcols=afun(2)
 
-## PCR
-set.seed(1)
-pcr_pf=gpf(Data=cdata$data,tree=cdata$phy,
-           frmla.phylo=hPCR~phylo,
-           family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
+## set x max
+plus=1
+pplus=plus+1
 
-## summarize
-pcr_pf_results=pfsum(pcr_pf)$results
+## fix taxa
+pcr_pf_results$taxa[1]="subclade~of~italic(Peromyscus)"
+pcr_pf_results$taxa[2]="italic(Oligoryzomys)"
 
-## competence
-set.seed(1)
-hc_pf=gpf(Data=cdata$data,tree=cdata$phy,
-          frmla.phylo=competence~phylo,
-          family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
+## ggtree
+gg=ggtree(dtree,size=0.25)+
+  geom_tippoint(aes(colour=infect),shape=15)+
+  scale_colour_manual(values=c("grey80","black"))+
+  guides(colour=F)
 
-## summarize
-hc_pf_results=pfsum(hc_pf)$results
+## add clades
+for(i in 1:nrow(pcr_pf_results)){
+  
+  gg=gg+
+    geom_hilight(node=pcr_pf_results$node[i],
+                 alpha=0.25,
+                 fill=ifelse(pcr_pf_results$clade>
+                               pcr_pf_results$other,pcols[2],pcols[1])[i])+
+    geom_cladelabel(node=pcr_pf_results$node[i],
+                    label=pcr_pf_results$taxa[i],
+                    offset=pplus,
+                    hjust=0.5,
+                    offset.text=pplus*2,
+                    parse=T,
+                    angle=90)
+}
+pcr_gg=gg
+
+## plot competence
+comp_gg=ggtree(dtree,size=0.25)+
+  geom_tippoint(aes(colour=comp),shape=15)+
+  scale_colour_manual(values=c("grey80","black"))+
+  guides(colour=F)
+
+## print
+library(ggpubr)
+setwd("~/Desktop/hantaro/figs")
+png("Figure 1.png",width=6,height=6,units="in",res=300)
+ggarrange(pcr_gg,comp_gg,ncol=2,widths=c(1.2,1),
+          labels=c("(A) infection","(B) competence"),
+          label.x=c(-0.1,-0.2),
+          font.label=list(face="plain",size=12))
+dev.off()
 
 ## add in hantavirus studies for PCR
 set.seed(1)

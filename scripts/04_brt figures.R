@@ -14,10 +14,18 @@ library(sciplot)
 setwd("~/Desktop/hantaro/data/clean files")
 pcr_brts=readRDS("pcr brts.rds")
 comp_brts=readRDS("comp brts.rds")
+pm_brts=readRDS("pm brts.rds")
 
 ## get net AUC
 mean(c(sapply(pcr_brts,function(x) x$testAUC),sapply(comp_brts,function(x) x$testAUC)))
 se(c(sapply(pcr_brts,function(x) x$testAUC),sapply(comp_brts,function(x) x$testAUC)))
+
+## for cites
+mean(sapply(pm_brts,function(x) x$testAUC))
+se(sapply(pm_brts,function(x) x$testAUC))
+
+## clean
+rm(pm_brts)
 
 ## independent auc
 mean(sapply(pcr_brts,function(x) x$testAUC))
