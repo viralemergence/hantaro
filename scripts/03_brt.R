@@ -28,6 +28,24 @@ data=read.csv('hantaro cleaned response and traits.csv')
 ## classify true negatives
 data$type=ifelse(data$studies>0 & data$hPCR==0 & data$competence==0,"true negative","other")
 
+## make binary columns for genus
+dums=dummy_cols(data["gen"])
+
+## unique
+dums=dums[!duplicated(dums$gen),]
+
+## ensure all factor
+for(i in 1:ncol(dums)){
+  
+  ## column as factor
+  dums[,i]=factor(dums[,i])
+  
+}
+
+## merge
+data=merge(data,dums,by="gen",all.x=T)
+rm(dums)
+
 ## mode function
 mode.prop <- function(x) {
   ux <- unique(x[is.na(x)==FALSE])
@@ -76,24 +94,6 @@ mval=mval[order(mval$comp),]
 data=data[keeps]
 rm(mval,keeps)
 
-## make binary columns for genus
-dums=dummy_cols(data["gen"])
-
-## unique
-dums=dums[!duplicated(dums$gen),]
-
-## ensure all factor
-for(i in 1:ncol(dums)){
-  
-  ## column as factor
-  dums[,i]=factor(dums[,i])
-  
-}
-
-## merge
-data=merge(data,dums,by="gen",all.x=T)
-rm(dums)
-
 ## drop unnecessary columns
 data$X=NULL
 data$superres=NULL
@@ -120,6 +120,29 @@ set$type=NULL
 
 ## remove studies
 set$studies=NULL
+
+## coverage table s1
+ts1=data.frame(apply(set,2,function(x) length(x[!is.na(x)])/nrow(set)))
+
+## get names
+ts1$variables=rownames(ts1)
+names(ts1)=c("comp","column")
+rownames(ts1)=NULL
+
+## sort
+ts1=ts1[order(ts1$column),]
+ts1$comp=round(ts1$comp,2)
+
+## trim disease data
+ts1=ts1[!ts1$column%in%c("hPCR","competence"),]
+ts1$feature=ts1$column
+ts1$column=NULL
+ts1$coverage=ts1$comp
+ts1$comp=NULL
+
+## write file
+setwd("~/Desktop/hantaro/figs")
+write.csv(ts1,"Table S1.csv")
 
 ## function to use different data partitions
 brt_part=function(seed,response){

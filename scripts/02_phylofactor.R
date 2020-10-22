@@ -244,53 +244,53 @@ ggarrange(pcr_gg,comp_gg,ncol=2,widths=c(1.2,1),
           font.label=list(face="plain",size=12))
 dev.off()
 
-## add in hantavirus studies for PCR
-set.seed(1)
-pcr_pf_study=gpf(Data=cdata$data,tree=cdata$phy,
-           frmla.phylo=hPCR~phylo,
-           weights=cdata$data$studies,
-           family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
-HolmProcedure(pcr_pf_study)
-
-## for competence
-set.seed(1)
-hc_pf_study=gpf(Data=cdata$data,tree=cdata$phy,
-                 frmla.phylo=competence~phylo,
-                 weights=cdata$data$studies,
-                 family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
-HolmProcedure(hc_pf_study)
-
-## log1p pubmed cites
-cdata$data$logcites=log1p(cdata$data$cites)
-
-## add in pubmed for PCR
-set.seed(1)
-pcr_pf_pm=gpf(Data=cdata$data,tree=cdata$phy,
-                 frmla.phylo=hPCR~phylo,
-                 weights=cdata$data$logcites,
-                 family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
-HolmProcedure(pcr_pf_pm)
-
-## for competence
-set.seed(1)
-hc_pf_pm=gpf(Data=cdata$data,tree=cdata$phy,
-                frmla.phylo=competence~phylo,
-                weights=cdata$data$logcites,
-                family=binomial,algorithm='phylo',nfactors=3,min.group.size=5)
-HolmProcedure(hc_pf_pm)
-
-## model studies and citations themselves
-set.seed(1)
-study_pf=gpf(Data=cdata$data,tree=cdata$phy,
-             frmla.phylo=studies~phylo,
-             family=poisson,algorithm='phylo',nfactors=5,min.group.size=5)
-HolmProcedure(study_pf)
-pfsum(study_pf)$results
-
-## citations
-set.seed(1)
-pm_pf=gpf(Data=cdata$data,tree=cdata$phy,
-             frmla.phylo=cites~phylo,
-             family=poisson,algorithm='phylo',nfactors=5,min.group.size=5)
-HolmProcedure(pm_pf)
-pfsum(pm_pf)$results
+# ## add in hantavirus studies for PCR
+# set.seed(1)
+# pcr_pf_study=gpf(Data=cdata$data,tree=cdata$phy,
+#            frmla.phylo=hPCR~phylo,
+#            weights=cdata$data$studies,
+#            family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
+# HolmProcedure(pcr_pf_study)
+# 
+# ## for competence
+# set.seed(1)
+# hc_pf_study=gpf(Data=cdata$data,tree=cdata$phy,
+#                  frmla.phylo=competence~phylo,
+#                  weights=cdata$data$studies,
+#                  family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
+# HolmProcedure(hc_pf_study)
+# 
+# ## log1p pubmed cites
+# cdata$data$logcites=log1p(cdata$data$cites)
+# 
+# ## add in pubmed for PCR
+# set.seed(1)
+# pcr_pf_pm=gpf(Data=cdata$data,tree=cdata$phy,
+#                  frmla.phylo=hPCR~phylo,
+#                  weights=cdata$data$logcites,
+#                  family=binomial,algorithm='phylo',nfactors=5,min.group.size=5)
+# HolmProcedure(pcr_pf_pm)
+# 
+# ## for competence
+# set.seed(1)
+# hc_pf_pm=gpf(Data=cdata$data,tree=cdata$phy,
+#                 frmla.phylo=competence~phylo,
+#                 weights=cdata$data$logcites,
+#                 family=binomial,algorithm='phylo',nfactors=3,min.group.size=5)
+# HolmProcedure(hc_pf_pm)
+# 
+# ## model studies and citations themselves
+# set.seed(1)
+# study_pf=gpf(Data=cdata$data,tree=cdata$phy,
+#              frmla.phylo=studies~phylo,
+#              family=poisson,algorithm='phylo',nfactors=5,min.group.size=5)
+# HolmProcedure(study_pf)
+# pfsum(study_pf)$results
+# 
+# ## citations
+# set.seed(1)
+# pm_pf=gpf(Data=cdata$data,tree=cdata$phy,
+#              frmla.phylo=cites~phylo,
+#              family=poisson,algorithm='phylo',nfactors=5,min.group.size=5)
+# HolmProcedure(pm_pf)
+# pfsum(pm_pf)$results

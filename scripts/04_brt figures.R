@@ -87,6 +87,10 @@ ranks=merge(vdata_pcr[c("var","pcr_rank","pcr_imp")],
             by="var")
 rm(vdata_comp,vdata_pcr)
 
+## Table S2
+setwd("~/Desktop/hantaro/figs")
+write.csv(ranks,"Table S2.csv")
+
 ## correlate
 cor.test(ranks$pcr_rank,ranks$comp_rank,method="spearman")
 
