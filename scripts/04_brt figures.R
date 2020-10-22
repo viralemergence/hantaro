@@ -87,16 +87,78 @@ ranks=merge(vdata_pcr[c("var","pcr_rank","pcr_imp")],
             by="var")
 rm(vdata_comp,vdata_pcr)
 
+## ranks for table S2
+ts2=ranks
+ts2$feature=ts2$var
+ts2=ts2[c("feature","pcr_imp","comp_imp","pcr_rank","comp_rank")]
+
 ## Table S2
 setwd("~/Desktop/hantaro/figs")
-write.csv(ranks,"Table S2.csv")
+write.csv(ts2,"Table S2.csv")
 
 ## correlate
 cor.test(ranks$pcr_rank,ranks$comp_rank,method="spearman")
 
 ## trim to non-zero
 ranks2=ranks[-which(ranks$pcr_imp==0 & ranks$comp_imp==0),]
+
+## rerank
+ranks2=ranks2[order(ranks2$pcr_imp,decreasing=T),]
+ranks2$pcr_rank=1:nrow(ranks2)
+ranks2=ranks2[order(ranks2$comp_imp,decreasing=T),]
+ranks2$comp_rank=1:nrow(ranks2)
 cor.test(ranks2$pcr_rank,ranks2$comp_rank,method="spearman")
+
+## set color
+col='grey70'
+
+## figure 2A
+set.seed(1)
+f2A=ggplot(adata,aes(response,auc))+
+  geom_boxplot(width=0.5,alpha=0.25,colour=col,fill=col)+
+  geom_jitter(width=0.1,colour=col,size=3,alpha=1)+
+  scale_x_discrete(labels=c("infection","competence"))+
+  guides(colour=F)+
+  ylim(0.8,1)+
+  theme_bw()+
+  labs(x="response variable",
+       y="BRT AUC")+
+  theme(axis.text=element_text(size=10),
+        axis.text.x=element_text(size=12),
+        axis.title=element_text(size=12))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+  guides(colour=F,fill=F)
+
+## figure 2B
+f2B=ggplot(ranks2,aes(pcr_rank,comp_rank))+
+  #geom_point()+
+  geom_label(aes(label=var),size=2,fill=col,alpha=0.2)+
+  #scale_y_reverse(limits=c(max(c(ranks$comp_rank,ranks$pcr_rank))+3,0))+
+  #scale_x_reverse(limits=c(max(c(ranks$comp_rank,ranks$pcr_rank))+3,0))+
+  scale_y_reverse(limits=c(max(c(ranks2$comp_rank,ranks2$pcr_rank))+4,0))+
+  scale_x_reverse(limits=c(max(c(ranks2$comp_rank,ranks2$pcr_rank))+4,0))+
+  #geom_abline(slope=1,linetype=2,size=0.5)+
+  theme_bw()+
+  labs(x="feature rank for PCR",
+       y="feature rank for competence")+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))
+
+## Figure 2
+library(ggpubr)
+setwd("~/Desktop/hantaro/figs")
+png("Figure 2.png",width=7,height=3.5,units="in",res=300)
+ggarrange(f2A,f2B,ncol=2,widths=c(1,1),
+          labels=c("(A)","(B)"),
+          label.x=c(0.21,0.18),
+          label.y=0.97,
+          font.label=list(face="plain",size=12))
+dev.off()
 
 ## average predictions: PCR
 pcr_apreds=lapply(pcr_brts,function(x) x$predict)

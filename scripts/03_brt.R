@@ -62,8 +62,8 @@ vars$variables=rownames(vars)
 names(vars)=c("var","uniq","column")
 vars$var=round(vars$var,2)
 
-## if mostly homogenous (97%)
-vars$keep=ifelse(vars$var<0.97,"keep","cut")
+## if homogenous (100%)
+vars$keep=ifelse(vars$var<1,"keep","cut")
 vars$keep=ifelse(vars$column%in%c('hPCR','competence',"fam"),'keep',vars$keep)
 vars=vars[order(vars$keep),]
 
@@ -120,6 +120,9 @@ set$type=NULL
 
 ## remove studies
 set$studies=NULL
+
+## covariates
+ncol(set)-2
 
 ## coverage table s1
 ts1=data.frame(apply(set,2,function(x) length(x[!is.na(x)])/nrow(set)))
