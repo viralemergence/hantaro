@@ -134,6 +134,18 @@ brt_part=function(seed,response){
   ndata$hPCR=NULL
   ndata$competence=NULL
   
+  ## fix cites if response
+  if(response=="cites"){
+    
+    ## plus 1 for 0
+    ndata$cites=ifelse(ndata$cites==0,1,ndata$cites)
+    
+  }else{
+    
+    ndata=ndata
+    
+  }
+  
   ## use rsample to split
   set.seed(seed)
   split=initial_split(ndata,prop=0.8,strata="response")
@@ -146,11 +158,17 @@ brt_part=function(seed,response){
   yTrain=dataTrain$response
   yTest=dataTest$response
   
+  ## dist
+  dist=ifelse(response=="cites","poisson","bernoulli")
+  
+  ## n.trees
+  nt=ifelse(response=="cites",10000,5000)
+  
   ## BRT
   set.seed(1)
   gbmOut=gbm(response ~ . ,data=dataTrain,
-             n.trees=5000,
-             distribution="bernoulli",
+             n.trees=nt,
+             distribution=dist,
              shrinkage=0.001,
              interaction.depth=3,
              n.minobsinnode=4,
@@ -172,6 +190,13 @@ brt_part=function(seed,response){
   ## AUC on test
   auc_test=gbm.roc.area(yTest,predict(gbmOut,dataTest,n.trees=best.iter,type="response"))
   
+  ## skip if poisson
+  if(response=="cites"){
+    
+    perf=NA
+    
+  }else{
+    
   ## ROC
   pr=prediction(preds,dataTest$response)
   perf=performance(pr,measure="tpr",x.measure="fpr")
@@ -180,6 +205,7 @@ brt_part=function(seed,response){
   
   ## add seed
   perf$seed=seed
+  }
   
   ## relative importance
   bars=summary(gbmOut,n.trees=best.iter,plotit=F)
@@ -223,6 +249,12 @@ comp_brts=lapply(1:smax,function(x) brt_part(seed=x,response="competence"))
 setwd("~/Desktop/hantaro/data/clean files")
 saveRDS(pcr_brts,"pcr brts.rds")
 saveRDS(comp_brts,"comp brts.rds")
+
+## run wos brts
+pm_brts=lapply(1:smax,function(x) brt_part(seed=x,response="cites"))
+
+## write
+saveRDS(pm_brts,"pm brts.rds")
 
 ## average predictions: PCR
 pcr_apreds=lapply(pcr_brts,function(x) x$predict)
