@@ -161,6 +161,11 @@ ggarrange(f2A,f2B,ncol=2,widths=c(1,1),
           font.label=list(face="plain",size=12))
 dev.off()
 
+## pdp
+detach("package:purrr", unload=TRUE)
+library(pdp)
+library(gbm)
+
 ## function for compiling across BRTs for a given predictor, all else equal
 pdp_agg=function(mod,feature){
   
@@ -310,9 +315,6 @@ pdp_plot=function(bmods,feature){
 setwd("~/Desktop/hantaro/data/clean files")
 data=read.csv('hantaro cleaned response and traits.csv')
 
-## classify true negatives
-data$type=ifelse(data$studies>0 & data$hPCR==0 & data$competence==0,"true negative","other")
-
 ## make binary columns for genus
 dums=dummy_cols(data["gen"])
 
@@ -365,6 +367,11 @@ p1+p2+p3+p4+p5+p6+p7+p8+p9+p10+
   c1+c2+c3+c4+c5+c6+c7+c8+c9+c10+plot_layout(nrow=10,ncol=2,byrow=F)
 dev.off()
 
+## clean
+rm(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,
+   c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,
+   ranks,ranks2,ts2,f2A,f2B,adata)
+
 ## average predictions: PCR
 pcr_apreds=lapply(pcr_brts,function(x) x$predict)
 pcr_apreds=do.call(rbind,pcr_apreds)
@@ -394,6 +401,22 @@ comp_apreds$type='competence'
 ## apreds
 apreds=rbind.data.frame(pcr_apreds,comp_apreds)
 
+## add study
+apreds=merge(apreds,data[c("treename","studies")],by="treename")
+
+## make positivity
+apreds$positivity=ifelse(apreds$hPCR==1 & apreds$type=="PCR",1,
+       ifelse(apreds$competence==1 & apreds$type=='competence',1,0))
+
+## make type
+apreds$cat=ifelse(apreds$studies==0,"unsampled",
+                  ifelse(apreds$positivity==1,"positive","negative"))
+
+## type
+library(plyr)
+apreds$type=factor(apreds$type,levels=c("PCR","competence"))
+apreds$type2=revalue(apreds$type,c("PCR"="infection"))
+
 ## long to wide
 apreds2=spread(apreds[c('treename','type','cpred')],type,cpred)
 comp_apreds$comp=comp_apreds$competence
@@ -402,27 +425,86 @@ comp_apreds$comp=comp_apreds$competence
 apreds2=merge(apreds2,comp_apreds[c("treename","hPCR","comp")],by="treename")
 
 ## fix names
-names(apreds2)=c("treename","pred_comp","pred_pcr","PCR","competence")
+names(apreds2)=c("treename","pred_pcr","pred_comp","PCR","competence")
+
+## classify true negatives
+data$type=ifelse(data$studies>0 & data$hPCR==0 & data$competence==0,"true negative","other")
+
+## with data
+apreds2=merge(apreds2,data[c("treename","type",'studies')],by='treename')
+
+## fix type
+apreds2$cat=ifelse(apreds2$studies==0,"unsampled",
+                   ifelse(apreds2$PCR==0 & apreds2$competence==0,"negative","positive"))
+
+## fix cat
+apreds2$cat=factor(apreds2$cat,c("positive",'negative','unsampled'))
+apreds$cat=factor(apreds$cat,levels=levels(apreds2$cat))
+
+## figure 3a
+library(viridis)
+f3A=ggplot(apreds,aes(cpred))+
+  geom_density(aes(fill=cat,colour=cat),alpha=0.5)+
+  facet_wrap(~type2,ncol=1,strip.position='top')+
+  theme_bw()+
+  theme(legend.position="top")+
+  labs(x=expression(paste("predicted probability (",italic(P),") of hosting")))+
+  xlim(0,1)+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=12),
+        strip.text=element_text(size=11))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+  scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  guides(colour=guide_legend(title="orthohantavirus positivity"),
+         fill=guide_legend(title="orthohantavirus positivity"))
+
+## scatterplot
+f3B=ggplot(apreds2,aes(pred_pcr,pred_comp))+
+  geom_point(alpha=0.5,size=2,aes(colour=cat,fill=cat))+
+  geom_smooth(method='gam',colour=col)+
+  labs(x=expression(paste(italic(P),' from infection models')),
+       y=expression(paste(italic(P),' from competence models')))+
+  theme_bw()+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  theme(legend.position="top")+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+  scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))
+
+## combine
+setwd("~/Desktop/hantaro/figs")
+png("Figure 3.png",width=6.5,height=4,units="in",res=300)
+ggarrange(f3A,f3B,common.legend=T)
+dev.off()
 
 ## save
 preds=apreds2
 
 ## clean
-rm(apreds,apreds2,comp_apreds,pcr_apreds)
-
-## load raw data
-setwd("~/Desktop/hantaro/data/clean files")
-data=read.csv('hantaro cleaned response and traits.csv')
-
-## classify true negatives
-data$type=ifelse(data$studies>0 & data$hPCR==0 & data$competence==0,"true negative","other")
+rm(apreds,apreds2)
 
 ## merge into predictions
 preds=merge(preds,data[c("treename","type","studies")],by="treename")
-rm(data)
 
 ## write file
 setwd("~/Desktop/hantaro/data/clean files")
 write.csv(preds,"hantaro predictions.csv")
 
-## 
+## scatterplot
+ggplot(preds,aes(infection,competence))+
+  geom_point(alpha=0.5,colour="black")+
+  geom_smooth(method='gam',colour=col)+
+  labs(x='predictions from PCR',
+       y='predictions from competence')+
+  theme_bw()+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))
