@@ -10,6 +10,12 @@ library(tidyr)
 library(ggplot2)
 library(sciplot)
 library(fastDummies)
+library(caper)
+library(ape)
+library(phylofactor)
+library(treeio)
+library(ggtree)
+library(plotrix)
 
 ## load files
 setwd("~/Desktop/hantaro/data/clean files")
@@ -431,7 +437,7 @@ names(apreds2)=c("treename","pred_pcr","pred_comp","PCR","competence")
 data$type=ifelse(data$studies>0 & data$hPCR==0 & data$competence==0,"true negative","other")
 
 ## with data
-apreds2=merge(apreds2,data[c("treename","type",'studies')],by='treename')
+apreds2=merge(apreds2,data[c("treename","type",'studies',"fam","gen")],by='treename')
 
 ## fix type
 apreds2$cat=ifelse(apreds2$studies==0,"unsampled",
@@ -445,21 +451,25 @@ apreds$cat=factor(apreds$cat,levels=levels(apreds2$cat))
 library(viridis)
 f3A=ggplot(apreds,aes(cpred))+
   geom_density(aes(fill=cat,colour=cat),alpha=0.5)+
-  facet_wrap(~type2,ncol=1,strip.position='top')+
+  facet_wrap(~type2,ncol=1,strip.position='top',scales="free_y")+
   theme_bw()+
   theme(legend.position="top")+
   labs(x=expression(paste("predicted probability (",italic(P),") of hosting")))+
   xlim(0,1)+
   theme(axis.text=element_text(size=10),
         axis.title=element_text(size=12),
-        strip.text=element_text(size=11))+
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=11),
+        strip.text=element_text(size=11),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(20,20,20,20))+
   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
   scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
   scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
-  guides(colour=guide_legend(title="orthohantavirus positivity"),
-         fill=guide_legend(title="orthohantavirus positivity"))
+  guides(colour=guide_legend(title="(A) orthohantavirus positivity"),
+         fill=guide_legend(title="(A) orthohantavirus positivity"))
 
 ## scatterplot
 f3B=ggplot(apreds2,aes(pred_pcr,pred_comp))+
@@ -469,42 +479,310 @@ f3B=ggplot(apreds2,aes(pred_pcr,pred_comp))+
        y=expression(paste(italic(P),' from competence models')))+
   theme_bw()+
   theme(axis.text=element_text(size=10),
-        axis.title=element_text(size=12))+
+        axis.title=element_text(size=12),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=11),
+        strip.text=element_text(size=11),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(20,20,20,20))+
   theme(legend.position="top")+
   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
   scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
-  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))
+  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  guides(colour=guide_legend(title="(A) orthohantavirus positivity"),
+         fill=guide_legend(title="(A) orthohantavirus positivity"))
 
 ## combine
 setwd("~/Desktop/hantaro/figs")
 png("Figure 3.png",width=6.5,height=4,units="in",res=300)
-ggarrange(f3A,f3B,common.legend=T)
+f3=ggarrange(f3A,f3B,common.legend=T)
+f3
 dev.off()
 
 ## save
 preds=apreds2
-
-## clean
-rm(apreds,apreds2)
-
-## merge into predictions
-preds=merge(preds,data[c("treename","type","studies")],by="treename")
+preds$fam=NULL
+preds$gen=NULL
 
 ## write file
 setwd("~/Desktop/hantaro/data/clean files")
 write.csv(preds,"hantaro predictions.csv")
 
-## scatterplot
-ggplot(preds,aes(infection,competence))+
-  geom_point(alpha=0.5,colour="black")+
-  geom_smooth(method='gam',colour=col)+
-  labs(x='predictions from PCR',
-       y='predictions from competence')+
-  theme_bw()+
-  theme(axis.text=element_text(size=10),
-        axis.title=element_text(size=12))+
-  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
-  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))
+## test correlation
+cor(apreds2$pred_pcr,apreds2$pred_comp,method='spearman')
+cor.test(apreds2$pred_pcr,apreds2$pred_comp,method='spearman')
+
+## load phylogeny
+setwd("~/Desktop/hantaro/data/clean files")
+rtree=readRDS('rodent phylo trim.rds')
+
+## setdiff
+apreds2$tree=ifelse(apreds2$treename%in%setdiff(apreds2$treename,rtree$tip.label),'cut','keep')
+table(apreds2$tree)
+
+## trim
+bdata=apreds2[-which(apreds2$tree=='cut'),]
+
+## match
+bdata=bdata[match(rtree$tip.label,bdata$treename),]
+
+## save
+bdata$label=bdata$treename
+bdata$Species=bdata$treename
+
+## merge
+cdata=comparative.data(phy=rtree,data=bdata,names.col=treename,vcv=T,na.omit=F,warn.dropped=T)
+
+## fix
+cdata$data$tree=NULL
+
+# ## lambda
+# pcr_lmod=pgls(pred_pcr~1,data=cdata,lambda="ML")
+# comp_lmod=pgls(pred_comp~1,data=cdata,lambda="ML")
+# summary(pcr_lmod)
+# summary(comp_lmod)
+## moderate phylogenetic signal in predictions
+
+## taxonomy
+cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
+
+## set taxonomy
+taxonomy=data.frame(cdata$data$taxonomy)
+names(taxonomy)="taxonomy"
+taxonomy$Species=rownames(cdata$data)
+taxonomy=taxonomy[c("Species","taxonomy")]
+taxonomy$taxonomy=as.character(taxonomy$taxonomy)
+
+## Holm rejection procedure
+HolmProcedure <- function(pf,FWER=0.05){
+  
+  ## get split variable
+  cs=names(coef(pf$models[[1]]))[-1]
+  split=ifelse(length(cs)>1,cs[3],cs[1])
+  
+  ## obtain p values
+  if (pf$models[[1]]$family$family%in%c('gaussian',"Gamma","quasipoisson")){
+    pvals <- sapply(pf$models,FUN=function(fit) summary(fit)$coefficients[split,'Pr(>|t|)'])
+  } else {
+    pvals <- sapply(pf$models,FUN=function(fit) summary(fit)$coefficients[split,'Pr(>|z|)'])
+  }
+  D <- length(pf$tree$tip.label)
+  
+  ## this is the line for Holm's sequentially rejective cutoff
+  keepers <- pvals<=(FWER/(2*D-3 - 2*(0:(pf$nfactors-1))))
+  
+  
+  if (!all(keepers)){
+    nfactors <- min(which(!keepers))-1
+  } else {
+    nfactors <- pf$nfactors
+  }
+  return(nfactors)
+}
+
+## get species in a clade
+cladeget=function(pf,factor){
+  spp=pf$tree$tip.label[pf$groups[[factor]][[1]]]
+  return(spp)
+}
+
+## summarize pf object 
+pfsum=function(pf){
+  
+  ## get formula
+  chars=as.character(pf$frmla.phylo)[-1]
+  
+  ## response
+  resp=chars[1]
+  
+  ## fix
+  resp=ifelse(resp=='cbind(pos, neg)','prevalence',resp)
+  
+  ## holm
+  hp=HolmProcedure(pf)
+  
+  ## save model
+  model=chars[2]
+  
+  ## set key
+  setkey(pf$Data,'Species')
+  
+  ## make data
+  dat=data.frame(pf$Data)
+  
+  ## make clade columns in data
+  for(i in 1:hp){
+    
+    dat[,paste0(resp,'_pf',i)]=ifelse(dat$Species%in%cladeget(pf,i),'factor','other')
+    
+  }
+  
+  ## make data frame to store taxa name, response, mean, and other
+  results=data.frame(matrix(ncol=6, nrow = hp))
+  colnames(results)=c('factor','taxa','tips','node',"clade",'other')
+  
+  ## set taxonomy
+  taxonomy=dat[c('Species','taxonomy')]
+  taxonomy$taxonomy=as.character(taxonomy$taxonomy)
+  
+  ## loop
+  for(i in 1:hp){
+    
+    ## get taxa
+    tx=pf.taxa(pf,taxonomy,factor=i)$group1
+    
+    ## get tail
+    tx=sapply(strsplit(tx,'; '),function(x) tail(x,1))
+    
+    ## combine
+    tx=paste(tx,collapse=', ')
+    
+    # save
+    results[i,'factor']=i
+    results[i,'taxa']=tx
+    
+    ## get node
+    tips=cladeget(pf,i)
+    node=ggtree::MRCA(pf$tree,tips)
+    results[i,'tips']=length(tips)
+    results[i,'node']=ifelse(is.null(node) & length(tips)==1,'species',
+                             ifelse(is.null(node) & length(tips)!=1,NA,node))
+    
+    ## get means
+    ms=(tapply(dat[,resp],dat[,paste0(resp,'_pf',i)],mean))
+    
+    ## add in
+    results[i,'clade']=ms['factor']
+    results[i,'other']=ms['other']
+    
+  }
+  
+  ## return
+  return(list(set=dat,results=results))
+}
+
+## fix palette
+AlberPalettes <- c("YlGnBu","Reds","BuPu", "PiYG")
+AlberColours <- sapply(AlberPalettes, function(a) RColorBrewer::brewer.pal(5, a)[4])
+afun=function(x){
+  a=AlberColours[1:x]
+  return(a)
+}
+
+## make low and high
+pcols=afun(2)
+
+## pcr predictions
+set.seed(1)
+pcrpred_pf=gpf(Data=cdata$data,tree=cdata$phy,
+            frmla.phylo=pred_pcr~phylo,
+            family=gaussian,algorithm='phylo',nfactors=5,min.group.size=5)
+
+## comp predictions
+set.seed(1)
+comppred_pf=gpf(Data=cdata$data,tree=cdata$phy,
+               frmla.phylo=pred_comp~phylo,
+               family=gaussian,algorithm='phylo',nfactors=6,min.group.size=5)
+
+## summarize
+pcrpred_pf_results=pfsum(pcrpred_pf)$results
+comppred_pf_results=pfsum(comppred_pf)$results
+
+## add model
+pcrpred_pf_results$model="infection"
+comppred_pf_results$model="competence"
+
+## bind
+predpfs=rbind.data.frame(pcrpred_pf_results,comppred_pf_results)
+
+## round
+predpfs$clade=round(predpfs$clade,2)
+predpfs$other=round(predpfs$other,2)
+
+## write
+setwd("~/Desktop/hantaro/figs")
+write.csv(predpfs,"Table S3.csv")
+
+## combine tree and data
+dtree=treeio::full_join(as.treedata(cdata$phy),cdata$data,by="label")
+
+## plot base tree
+pbase=ggtree(dtree,layout="fan",branch.length="none",size=0.25)
+
+## get tree data
+tdata=pbase$data
+
+## tips only
+tdata=tdata[which(tdata$isTip==T),]
+
+## set x max
+xmax=max(tdata$x)+10
+
+## make data frame
+samp=data.frame(x=tdata$x,
+                y=tdata$y,
+                yend=tdata$y,
+                xend_pcr=rescale(cdata$data$pred_pcr,c(max(tdata$x),xmax)),
+                xend_comp=rescale(cdata$data$pred_comp,c(max(tdata$x),xmax)),
+                pred_pcr=(cdata$data$pred_pcr),
+                pred_comp=(cdata$data$pred_comp),
+                treename=tdata$label)
+
+## merge with cat
+samp=merge(samp,apreds2[c("treename","cat")],by="treename",all.x=T)
+
+## pcr
+gg=pbase
+for(i in 1:nrow(pcrpred_pf_results)){
+  
+  gg=gg+
+    geom_hilight(node=pcrpred_pf_results$node[i],
+                 alpha=0.5,
+                 fill="black")
+}
+
+## add preds
+p1=gg+
+  geom_segment(data=samp,aes(x=x,y=y,xend=xend_pcr,yend=yend,colour=cat),size=0.75)+
+  scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  guides(colour=F)
+
+## competence
+gg=pbase
+for(i in 1:nrow(comppred_pf_results)){
+  
+  gg=gg+
+    geom_hilight(node=comppred_pf_results$node[i],
+                 alpha=0.5,
+                 fill="black")
+}
+
+## add preds
+p2=gg+
+  geom_segment(data=samp,aes(x=x,y=y,xend=xend_comp,yend=yend,colour=cat),size=0.75)+
+  scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  guides(colour=F)
+
+## combine
+f3C=p1+p2
+f3C=ggarrange(p1,p2,
+              labels=c("(B) infection predictions","(C) competence predictions"),
+              label.x=c(-0.03,-0.1),
+              label.y=0.1,
+              font.label=list(face="plain",size=13))
+
+## revise fig 3
+setwd("~/Desktop/hantaro/figs")
+png("Figure 3-2.png",width=7,height=7.25,units="in",res=300)
+#f3+f3C+plot_layout(nrow=2,heights=c(1.25,1))
+ggarrange(f3,f3C,nrow=2,heights=c(1.1,1))
+#f3B+f3C+plot_layout(nrow=2,heights=c(1,1.5))
+#f3B|(p1/p2)+plot_layout(widths=c(1.5,1))
+dev.off()
+
+# ## revise
+# f3B+f3C+plot_layout(nrow=2)
