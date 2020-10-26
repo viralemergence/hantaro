@@ -739,7 +739,7 @@ for(i in 1:nrow(pcrpred_pf_results)){
   
   gg=gg+
     geom_hilight(node=pcrpred_pf_results$node[i],
-                 alpha=0.5,
+                 alpha=ifelse(pcrpred_pf_results$tips[i]/Ntip(cdata$phy)<0.5,0.5,0.25),
                  fill="black")
 }
 
@@ -756,7 +756,7 @@ for(i in 1:nrow(comppred_pf_results)){
   
   gg=gg+
     geom_hilight(node=comppred_pf_results$node[i],
-                 alpha=0.5,
+                 alpha=ifelse(comppred_pf_results$tips[i]/Ntip(cdata$phy)<0.5,0.5,0.15),
                  fill="black")
 }
 
