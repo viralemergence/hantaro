@@ -23,6 +23,17 @@ pcr_brts=readRDS("pcr brts.rds")
 comp_brts=readRDS("comp brts.rds")
 pm_brts=readRDS("pm brts.rds")
 
+## index non-missing
+pcr_keep=which(!is.na(sapply(pcr_brts,function(x) x$testAUC)))
+comp_keep=which(!is.na(sapply(comp_brts,function(x) x$testAUC)))
+
+## all
+keep=intersect(pcr_keep,comp_keep)
+
+## trim
+pcr_brts=pcr_brts[keep]
+comp_brts=comp_brts[keep]
+
 ## get net AUC
 mean(c(sapply(pcr_brts,function(x) x$testAUC),sapply(comp_brts,function(x) x$testAUC)))
 se(c(sapply(pcr_brts,function(x) x$testAUC),sapply(comp_brts,function(x) x$testAUC)))
@@ -44,16 +55,43 @@ se(sapply(comp_brts,function(x) x$testAUC))
 n=length(sapply(pcr_brts,function(x) x$testAUC))
 adata=data.frame(auc=c(sapply(pcr_brts,function(x) x$testAUC),
                        sapply(comp_brts,function(x) x$testAUC)),
-                 response=c(rep('infection',n),rep('competence',n)))
+                 response=c(rep('infection',n),rep('competence',n)),
+                 seed=c(sapply(pcr_brts,function(x) x$seed),
+                        sapply(comp_brts,function(x) x$seed)))
 rm(n)
 
 ## factor
 adata$response=factor(adata$response,levels=c('infection','competence'))
 
-## t test
+## long to wide
+adata2=spread(adata,response,auc)
+
+## difference
+adata2$diff=adata2$competence-adata2$infection
+
+## paired t test
+summary(lm(diff~1,data=adata2))
+
+## more formal
+t.test(adata2$infection,adata2$competence,paired=T)
+
+## adata
 t.test(auc~response,data=adata,
        alternative='two.sided',
-       var.equal=F)                 
+       var.equal=F,paired=T)  
+
+## effect size
+library(rstatix)
+cohens_d(auc~response,data=adata,paired=T)
+
+## vis 
+set.seed(1)
+ggplot(adata, aes(y=auc)) +
+  geom_boxplot(aes(x=response, group=response), width=0.2, outlier.shape = NA) +
+  geom_point(aes(x=response),alpha=0.5) +
+  geom_line(aes(x=response, group=seed),alpha=0.5) +
+  xlab("Condition") + ylab("Value") +
+  theme_bw()
 
 ## relative importance for PCR
 vinf=lapply(pcr_brts,function(x) x$rinf)
@@ -538,12 +576,12 @@ cdata=comparative.data(phy=rtree,data=bdata,names.col=treename,vcv=T,na.omit=F,w
 ## fix
 cdata$data$tree=NULL
 
-# ## lambda
-# pcr_lmod=pgls(pred_pcr~1,data=cdata,lambda="ML")
-# comp_lmod=pgls(pred_comp~1,data=cdata,lambda="ML")
-# summary(pcr_lmod)
-# summary(comp_lmod)
-## moderate phylogenetic signal in predictions
+## lambda
+pcr_lmod=pgls(pred_pcr~1,data=cdata,lambda="ML")
+comp_lmod=pgls(pred_comp~1,data=cdata,lambda="ML")
+summary(pcr_lmod)
+summary(comp_lmod)
+# moderate phylogenetic signal in predictions
 
 ## taxonomy
 cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
