@@ -189,9 +189,6 @@ ranks2=ranks2[order(ranks2$comp_imp,decreasing=T),]
 ranks2$comp_rank=1:nrow(ranks2)
 cor.test(ranks2$pcr_rank,ranks2$comp_rank,method="spearman")
 
-## set color
-col='grey70'
-
 ## figure 2A
 set.seed(1)
 # f2A=ggplot(adata,aes(response,auc))+
@@ -217,10 +214,15 @@ ranks2$resid=abs(resid(lm(comp_rank~pcr_rank,data=ranks2)))
 ## flag if resid>10
 ranks2$select=ifelse(ranks2$resid>10,"yes","no")
 
+## flag if consistently low or consistently high
+n=7
+ranks2$select=ifelse(ranks2$comp_rank<n & ranks2$pcr_rank<n,"yes",ranks2$select)
+ranks2$select=ifelse(ranks2$comp_rank%in%tail(1:nrow(ranks2),n) & 
+                       ranks2$pcr_rank%in%tail(1:nrow(ranks2),n),"yes",ranks2$select)
+
 ## flag if high or low ranks
-n=4
-rnk=c(head(ranks2$comp_rank,n),tail(ranks2$comp_rank,n))
-ranks2$select=ifelse(ranks2$comp_rank%in%rnk,"yes",ranks2$select)
+# rnk=c(head(ranks2$comp_rank,n),tail(ranks2$comp_rank,n))
+# ranks2$select=ifelse(ranks2$comp_rank%in%rnk,"yes",ranks2$select)
 
 ## just yes
 rset=ranks2[ranks2$select=="yes",]
@@ -234,10 +236,10 @@ set.seed(1)
 f2B=ggplot(ranks2,aes(pcr_rank,comp_rank))+
   #geom_label(data=rset,aes(label=var),size=2,fill=col,alpha=0.2)+
   geom_text_repel(data=rset,aes(label=var),
-                  size=3,
-                  force=3,
-                  nudge_y=-2,
-                  nudge_x=1,
+                  size=2,
+                  force=4,
+                  #nudge_y=-2,
+                  #nudge_x=1,
                   direction="both",
                   segment.size=0.5,
                   segment.color="grey")+
@@ -336,10 +338,10 @@ pdp_plot=function(bmods,feature){
       geom_segment(data=hi,inherit.aes=F,
                    aes(x=mids,xend=mids,
                        y=yrange[1],yend=plotrix::rescale(counts,yrange)),
-                   size=1,colour=col,alpha=0.25)+
+                   size=1,colour="grey",alpha=0.25)+
       
       ## add lines
-      geom_line(size=1,alpha=0.5,colour=col)+
+      geom_line(size=1,alpha=0.25,colour="grey")+
       
       ## add mean
       geom_line(data=pmean,size=2,inherit.aes=F,
@@ -388,7 +390,7 @@ pdp_plot=function(bmods,feature){
     ggplot(agg,aes(predictor,yhat,group=seed))+
       
       ## add individual BRTs
-      geom_jitter(size=1,alpha=0.5,colour=col,width=0.1)+
+      geom_jitter(size=1,alpha=0.25,colour="grey",width=0.1)+
       
       ## add mean
       geom_point(data=pmean,size=2,inherit.aes=F,shape=15,
@@ -398,7 +400,7 @@ pdp_plot=function(bmods,feature){
       geom_rug(data=temp,inherit.aes=F,
                aes(predictor,yhat),
                sides="b",position="jitter",
-               colour=col,alpha=0.25,
+               colour="grey",alpha=0.25,
                na.rm=T)+
       
       ## theme
@@ -547,7 +549,9 @@ apreds2$cat=factor(apreds2$cat,c("positive",'negative','unsampled'))
 apreds$cat=factor(apreds$cat,levels=levels(apreds2$cat))
 
 ## figure 3a
-library(viridis)
+library(awtools)
+cc=mpalette[2:4] 
+cc=rev(cc)
 f3A=ggplot(apreds,aes(cpred))+
   geom_density(aes(fill=cat,colour=cat),alpha=0.5)+
   facet_wrap(~type2,ncol=1,strip.position='top',scales="free_y")+
@@ -565,15 +569,16 @@ f3A=ggplot(apreds,aes(cpred))+
   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
-  scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
-  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  scale_colour_manual(values=cc)+
+  scale_fill_manual(values=cc)+
   guides(colour=guide_legend(title="(A) orthohantavirus positivity"),
          fill=guide_legend(title="(A) orthohantavirus positivity"))
+f3A
 
 ## scatterplot
 f3B=ggplot(apreds2,aes(pred_pcr,pred_comp))+
   geom_point(alpha=0.5,size=2,aes(colour=cat,fill=cat))+
-  geom_smooth(method='gam',colour=col)+
+  geom_smooth(method='gam',colour="grey")+
   labs(x=expression(paste(italic(P),' from infection models')),
        y=expression(paste(italic(P),' from competence models')))+
   theme_bw()+
@@ -588,8 +593,8 @@ f3B=ggplot(apreds2,aes(pred_pcr,pred_comp))+
   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
-  scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
-  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  scale_colour_manual(values=cc)+
+  scale_fill_manual(values=cc)+
   guides(colour=guide_legend(title="(A) orthohantavirus positivity"),
          fill=guide_legend(title="(A) orthohantavirus positivity"))
 
