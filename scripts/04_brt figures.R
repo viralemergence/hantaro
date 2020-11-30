@@ -782,13 +782,13 @@ pcols=afun(2)
 set.seed(1)
 pcrpred_pf=gpf(Data=cdata$data,tree=cdata$phy,
             frmla.phylo=pred_pcr~phylo,
-            family=gaussian,algorithm='phylo',nfactors=5,min.group.size=5)
+            family=gaussian,algorithm='phylo',nfactors=6,min.group.size=5)
 
 ## comp predictions
 set.seed(1)
 comppred_pf=gpf(Data=cdata$data,tree=cdata$phy,
                frmla.phylo=pred_comp~phylo,
-               family=gaussian,algorithm='phylo',nfactors=6,min.group.size=5)
+               family=gaussian,algorithm='phylo',nfactors=7,min.group.size=5)
 
 ## summarize
 pcrpred_pf_results=pfsum(pcrpred_pf)$results
@@ -850,8 +850,8 @@ for(i in 1:nrow(pcrpred_pf_results)){
 ## add preds
 p1=gg+
   geom_segment(data=samp,aes(x=x,y=y,xend=xend_pcr,yend=yend,colour=cat),size=0.75)+
-  scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
-  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  scale_colour_manual(values=cc)+
+  scale_fill_manual(values=cc)+
   guides(colour=F)
 
 ## competence
@@ -867,8 +867,8 @@ for(i in 1:nrow(comppred_pf_results)){
 ## add preds
 p2=gg+
   geom_segment(data=samp,aes(x=x,y=y,xend=xend_comp,yend=yend,colour=cat),size=0.75)+
-  scale_colour_manual(values=c(col,viridis(2,option="E",end=0.8)))+
-  scale_fill_manual(values=c(col,viridis(2,option="E",end=0.8)))+
+  scale_colour_manual(values=cc)+
+  scale_fill_manual(values=cc)+
   guides(colour=F)
 
 ## combine
@@ -887,6 +887,3 @@ ggarrange(f3,f3C,nrow=2,heights=c(1.1,1))
 #f3B+f3C+plot_layout(nrow=2,heights=c(1,1.5))
 #f3B|(p1/p2)+plot_layout(widths=c(1.5,1))
 dev.off()
-
-# ## revise
-# f3B+f3C+plot_layout(nrow=2)
