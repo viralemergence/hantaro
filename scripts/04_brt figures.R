@@ -16,6 +16,9 @@ library(phylofactor)
 library(treeio)
 library(ggtree)
 library(plotrix)
+library(rstatix)
+library(ggrepel)
+library(ggpubr)
 
 ## load files
 setwd("~/Desktop/hantaro/data/clean files")
@@ -72,26 +75,58 @@ adata2$diff=adata2$competence-adata2$infection
 ## paired t test
 summary(lm(diff~1,data=adata2))
 
-## more formal
+## formal test for reporting
 t.test(adata2$infection,adata2$competence,paired=T)
 
-## adata
+## t-test
 t.test(auc~response,data=adata,
        alternative='two.sided',
        var.equal=F,paired=T)  
 
 ## effect size
-library(rstatix)
 cohens_d(auc~response,data=adata,paired=T)
 
-## vis 
+## make jitter position
+adata$x=as.numeric(factor(adata$response))
 set.seed(1)
-ggplot(adata, aes(y=auc)) +
-  geom_boxplot(aes(x=response, group=response), width=0.2, outlier.shape = NA) +
-  geom_point(aes(x=response),alpha=0.5) +
-  geom_line(aes(x=response, group=seed),alpha=0.5) +
-  xlab("Condition") + ylab("Value") +
-  theme_bw()
+adata$xj=jitter(adata$x,0.5)
+
+## dataset of means
+amean=data.frame(mean=tapply(adata$auc,adata$response,mean))
+amean$se=tapply(adata$auc,adata$response,se)
+amean$lower=amean$mean-(1.96*amean$se)
+amean$upper=amean$mean+(1.96*amean$se)
+amean$response=rownames(amean)
+
+## x
+amean$response=factor(amean$response,levels=levels(adata$response))
+amean$x=as.numeric(factor(amean$response))
+
+## plot with segments
+set.seed(1)
+f2A=ggplot(adata)+
+  #geom_violin(aes(x=x,y=auc,group=x),trim=T,scale="count",width=0.5)+
+  geom_boxplot(aes(x=x,y=auc,group=x),width=0.25,alpha=0.25)+
+  geom_line(aes(x=xj,y=auc,group=seed),alpha=0.25)+
+  geom_point(aes(x=xj,y=auc),size=1.5,alpha=1)+
+  scale_x_continuous(breaks=c(1,2),
+                     labels=levels(adata$response),
+                     limits=c(0.5,2.5))+
+  theme_bw()+
+  labs(x="response variable",
+       y="model performance (AUC)")+
+  theme(axis.text=element_text(size=10),
+        axis.text.x=element_text(size=12),
+        axis.title=element_text(size=12))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+  guides(colour=F)#+
+  
+  ## add mean
+  #geom_line(data=amean,aes(x=x,y=mean),size=1.5)+
+  #geom_segment(data=amean,aes(x=x,xend=x,y=lower,yend=upper),size=1.5)+
+  #geom_point(data=amean,aes(x=x,y=mean),size=3,shape=15)
 
 ## relative importance for PCR
 vinf=lapply(pcr_brts,function(x) x$rinf)
@@ -159,27 +194,54 @@ col='grey70'
 
 ## figure 2A
 set.seed(1)
-f2A=ggplot(adata,aes(response,auc))+
-  geom_boxplot(width=0.5,alpha=0.25,colour=col,fill=col)+
-  geom_jitter(width=0.1,colour=col,size=3,alpha=1)+
-  scale_x_discrete(labels=c("infection","competence"))+
-  guides(colour=F)+
-  ylim(0.8,1)+
-  theme_bw()+
-  labs(x="response variable",
-       y="BRT AUC")+
-  theme(axis.text=element_text(size=10),
-        axis.text.x=element_text(size=12),
-        axis.title=element_text(size=12))+
-  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
-  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
-  guides(colour=F,fill=F)
+# f2A=ggplot(adata,aes(response,auc))+
+#   geom_boxplot(width=0.5,alpha=0.25,colour=col,fill=col)+
+#   geom_jitter(width=0.1,colour=col,size=3,alpha=1)+
+#   scale_x_discrete(labels=c("infection","competence"))+
+#   guides(colour=F)+
+#   ylim(0.8,1)+
+#   theme_bw()+
+#   labs(x="response variable",
+#        y="BRT AUC")+
+#   theme(axis.text=element_text(size=10),
+#         axis.text.x=element_text(size=12),
+#         axis.title=element_text(size=12))+
+#   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+#   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+#   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+#   guides(colour=F,fill=F)
+
+## identify features with high residuals
+ranks2$resid=abs(resid(lm(comp_rank~pcr_rank,data=ranks2)))
+
+## flag if resid>10
+ranks2$select=ifelse(ranks2$resid>10,"yes","no")
+
+## flag if high or low ranks
+n=4
+rnk=c(head(ranks2$comp_rank,n),tail(ranks2$comp_rank,n))
+ranks2$select=ifelse(ranks2$comp_rank%in%rnk,"yes",ranks2$select)
+
+## just yes
+rset=ranks2[ranks2$select=="yes",]
+
+## rset as ranks2
+rset=ranks2
+rset$var=ifelse(rset$select=="yes",rset$var,"")
 
 ## figure 2B
+set.seed(1)
 f2B=ggplot(ranks2,aes(pcr_rank,comp_rank))+
-  #geom_point()+
-  geom_label(aes(label=var),size=2,fill=col,alpha=0.2)+
+  #geom_label(data=rset,aes(label=var),size=2,fill=col,alpha=0.2)+
+  geom_text_repel(data=rset,aes(label=var),
+                  size=3,
+                  force=3,
+                  nudge_y=-2,
+                  nudge_x=1,
+                  direction="both",
+                  segment.size=0.5,
+                  segment.color="grey")+
+  geom_point()+
   #scale_y_reverse(limits=c(max(c(ranks$comp_rank,ranks$pcr_rank))+3,0))+
   #scale_x_reverse(limits=c(max(c(ranks$comp_rank,ranks$pcr_rank))+3,0))+
   scale_y_reverse(limits=c(max(c(ranks2$comp_rank,ranks2$pcr_rank))+4,0))+
@@ -195,7 +257,6 @@ f2B=ggplot(ranks2,aes(pcr_rank,comp_rank))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))
 
 ## Figure 2
-library(ggpubr)
 setwd("~/Desktop/hantaro/figs")
 png("Figure 2.png",width=7,height=3.5,units="in",res=300)
 ggarrange(f2A,f2B,ncol=2,widths=c(1,1),
