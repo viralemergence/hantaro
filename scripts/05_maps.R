@@ -22,16 +22,44 @@ pred <- read_csv("./data/clean files/hantaro predictions.csv")
 
 library(PresenceAbsence)
 
+###################### INTERMISSION: THRESHOLD IMPACTS
+
+ts.p <- optimal.thresholds(data.frame(pred[,c('treename','PCR','pred_pcr')]),
+                            threshold = 10001,
+                            opt.methods = c(2,4,5,10),
+                            req.sens = 0.90,
+                            na.rm = TRUE)
+
+cut.p <- function(x) {sum(pred$pred_pcr[pred$PCR==0] > x)}
+
+sapply(unlist(ts.p[2]), cut.p)
+
+
+ts.c <- optimal.thresholds(data.frame(pred[,c('treename','competence','pred_comp')]),
+                           threshold = 10001,
+                           opt.methods = c(2,4,5,10),
+                           req.sens = 0.90,
+                           na.rm = TRUE)
+
+cut.c <- function(x) {sum(pred$pred_comp[pred$competence==0] > x)}
+
+sapply(unlist(ts.c[2]), cut.c)
+
+
+
+
+###################### MOVE FORWARD
+
 t.pcr <- optimal.thresholds(data.frame(pred[,c('treename','PCR','pred_pcr')]),
                              threshold = 10001,
                              opt.methods = 10,
-                             req.sens = 0.9,
+                             req.sens = 0.95,
                              na.rm = TRUE)
 
 t.comp <- optimal.thresholds(data.frame(pred[,c('treename','competence','pred_comp')]),
                             threshold = 10001,
                             opt.methods = 10,
-                            req.sens = 0.9,
+                            req.sens = 0.95,
                             na.rm = TRUE)
 
 # Threshold the results to binary outputs
@@ -62,6 +90,9 @@ pred %>% filter(bin_comp==1) %>% pull(treename) %>% gsub("_"," ",.) -> pred.comp
 
 pred %>% filter(bin_pcr==1) %>% pull(treename) %>% gsub("_"," ",.) -> pred.pcr
 
+sort(pred.pcr[!(pred.pcr %in% known.pcr)])
+
+sort(pred.comp[!(pred.comp %in% known.comp)])
 
 # 2. Let's make some maps?
 
@@ -107,14 +138,14 @@ library(RColorBrewer)
 mycolors <- colorRampPalette(rev(brewer.pal(10,"Spectral")))(21)
 mycolors[1] <- "#C0C0C0"
 
-#rasterVis::levelplot(maps,  
-#                     col.regions = mycolors,
-#                     #at = seq(0, 15, 1),
-#                     alpha = 0.5, 
-#                     scales=list(alternating=FALSE),
-#                     par.strip.text=list(cex=0),
-#                     xlab = NULL, ylab = NULL,
-#                     maxpixels = 5e6)
+rasterVis::levelplot(maps,  
+                     col.regions = mycolors,
+                     #at = seq(0, 15, 1),
+                     alpha = 0.5, 
+                     scales=list(alternating=FALSE),
+                     par.strip.text=list(cex=0),
+                     xlab = NULL, ylab = NULL,
+                     maxpixels = 5e6)
 
 ##########################################################################
 
@@ -164,7 +195,7 @@ colmat<-function(nquantiles=10, upperleft=rgb(0,150,235, maxColorValue=255), upp
 
 col.matrix<-colmat(nquantiles=5, upperleft="#be64ac", upperright="#3b4994",
                    bottomleft="#e8e8e8", bottomright="#5ac8c8", 
-                   ylab = "Human footprint", xlab = "Hantavirus reservoirs")
+                   ylab = "Human footprint", xlab = "Hantavirus hosts")
 
 # Generate the bivariate map
 
@@ -194,7 +225,13 @@ bivariate.map<-function(rasterx, rastery, colormatrix=col.matrix, nquantiles=10)
   r[1:length(r)]<-cols
   return(r)}
 
-layers <- raster::stack(foot, map.all)
+layers <- raster::stack(foot, maps$PredPCR)
+layers <- embarcadero::bigstack(layers, 5)
+bivmap<-bivariate.map(layers[[2]], layers[[1]], colormatrix = col.matrix, nquantiles = 5)
+plot(bivmap, frame.plot = TRUE, axes = F, box = T, add = F, legend = F, col = as.vector(col.matrix), asp = 1)
+map(interior = T, add = T)
+
+layers <- raster::stack(foot, maps$PredComp)
 layers <- embarcadero::bigstack(layers, 5)
 bivmap<-bivariate.map(layers[[2]], layers[[1]], colormatrix = col.matrix, nquantiles = 5)
 plot(bivmap, frame.plot = TRUE, axes = F, box = T, add = F, legend = F, col = as.vector(col.matrix), asp = 1)
