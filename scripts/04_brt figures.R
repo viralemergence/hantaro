@@ -189,25 +189,6 @@ ranks2=ranks2[order(ranks2$comp_imp,decreasing=T),]
 ranks2$comp_rank=1:nrow(ranks2)
 cor.test(ranks2$pcr_rank,ranks2$comp_rank,method="spearman")
 
-## figure 2A
-set.seed(1)
-# f2A=ggplot(adata,aes(response,auc))+
-#   geom_boxplot(width=0.5,alpha=0.25,colour=col,fill=col)+
-#   geom_jitter(width=0.1,colour=col,size=3,alpha=1)+
-#   scale_x_discrete(labels=c("infection","competence"))+
-#   guides(colour=F)+
-#   ylim(0.8,1)+
-#   theme_bw()+
-#   labs(x="response variable",
-#        y="BRT AUC")+
-#   theme(axis.text=element_text(size=10),
-#         axis.text.x=element_text(size=12),
-#         axis.title=element_text(size=12))+
-#   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-#   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
-#   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
-#   guides(colour=F,fill=F)
-
 ## identify features with high residuals
 ranks2$resid=abs(resid(lm(comp_rank~pcr_rank,data=ranks2)))
 
@@ -250,7 +231,7 @@ f2B=ggplot(ranks2,aes(pcr_rank,comp_rank))+
   scale_x_reverse(limits=c(max(c(ranks2$comp_rank,ranks2$pcr_rank))+4,0))+
   #geom_abline(slope=1,linetype=2,size=0.5)+
   theme_bw()+
-  labs(x="feature rank for PCR",
+  labs(x="feature rank for infection",
        y="feature rank for competence")+
   theme(axis.text=element_text(size=10),
         axis.title=element_text(size=12))+
