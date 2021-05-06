@@ -92,18 +92,17 @@ pfsum=function(pf){
   
   ## get formula
   chars=as.character(pf$frmla.phylo)[-1]
+  chars=strsplit(as.character(pf$frmla.phylo)," ")[[1]]
   
   ## response
   resp=chars[1]
-  
-  ## fix
-  resp=ifelse(resp=='cbind(pos, neg)','prevalence',resp)
   
   ## holm
   hp=HolmProcedure(pf)
   
   ## save model
-  model=chars[2]
+  #model=chars[2]
+  model=chars[3]
   
   ## set key
   setkey(pf$Data,'Species')

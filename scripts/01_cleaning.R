@@ -13,6 +13,10 @@ library(plyr)
 setwd("~/Desktop/hantaro/data/raw")
 hdata=read.csv("Muroid Taxonomy and Traits with Hantavirus Evidence.csv",header=T)
 
+## fix missing PCR studies
+hdata$X..papers.PCR.pos=ifelse(hdata$Species_Name=="Akodon_simulator",1,hdata$X..papers.PCR.pos)
+hdata$X..papers.PCR.pos=ifelse(hdata$Species_Name=="Calomys_callosus",1,hdata$X..papers.PCR.pos)
+
 ## synonym IUCN
 hdata$IUCNname=hdata$Notes.regarding.IUCN.status
 

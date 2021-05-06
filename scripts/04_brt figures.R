@@ -629,6 +629,8 @@ comp_lmod=pgls(pred_comp~1,data=cdata,lambda="ML")
 summary(pcr_lmod)
 summary(comp_lmod)
 # moderate phylogenetic signal in predictions
+## pcr = 0.619
+## comp = 0.55
 
 ## taxonomy
 cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
