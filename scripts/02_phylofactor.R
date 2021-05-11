@@ -37,6 +37,11 @@ cdata=comparative.data(phy=rtree,data=bdata,names.col=treename,vcv=T,na.omit=F,w
 ## fix
 cdata$data$tree=NULL
 
+## proportion of each
+nrow(data)
+round(prop.table(table(data$hPCR)),4)*100
+round(prop.table(table(data$competence)),4)*100
+
 ## phylogenetic signal in response
 ## D of 0 = Brownian model, D of 1 = random (no phylogenetic signal)
 set.seed(1)
@@ -92,8 +97,7 @@ pfsum=function(pf){
   
   ## get formula
   chars=as.character(pf$frmla.phylo)[-1]
-  chars=strsplit(as.character(pf$frmla.phylo)," ")[[1]]
-  
+
   ## response
   resp=chars[1]
   
@@ -101,8 +105,7 @@ pfsum=function(pf){
   hp=HolmProcedure(pf)
   
   ## save model
-  #model=chars[2]
-  model=chars[3]
+  model=chars[2]
   
   ## set key
   setkey(pf$Data,'Species')
@@ -200,8 +203,8 @@ plus=1
 pplus=plus+1
 
 ## fix taxa
-pcr_pf_results$taxa[1]="subclade~of~italic(Peromyscus)"
-pcr_pf_results$taxa[2]="italic(Oligoryzomys)"
+pcr_pf_results$taxa[1]="italic(Oligoryzomys)"
+pcr_pf_results$taxa[2]="subclade~of~italic(Peromyscus)"
 
 ## ggtree
 gg=ggtree(dtree,size=0.25)+
@@ -220,7 +223,7 @@ for(i in 1:nrow(pcr_pf_results)){
     geom_cladelabel(node=pcr_pf_results$node[i],
                     label=pcr_pf_results$taxa[i],
                     offset=pplus,
-                    hjust=0.5,
+                    hjust=0.75,
                     offset.text=pplus*2,
                     parse=T,
                     angle=90)
@@ -238,7 +241,7 @@ library(ggpubr)
 setwd("~/Desktop/hantaro/figs")
 png("Figure 1.png",width=6,height=6,units="in",res=300)
 ggarrange(pcr_gg,comp_gg,ncol=2,widths=c(1.2,1),
-          labels=c("(A) infection","(B) competence"),
+          labels=c("(A) RT-PCR","(B) virus isolation"),
           label.x=c(-0.1,-0.2),
           font.label=list(face="plain",size=12))
 dev.off()
