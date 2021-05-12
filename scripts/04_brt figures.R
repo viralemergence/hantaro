@@ -19,6 +19,7 @@ library(plotrix)
 library(rstatix)
 library(ggrepel)
 library(ggpubr)
+library(plyr)
 
 ## load files
 setwd("~/Desktop/hantaro/data/clean files")
@@ -102,6 +103,12 @@ amean$response=rownames(amean)
 amean$response=factor(amean$response,levels=levels(adata$response))
 amean$x=as.numeric(factor(amean$response))
 
+## fix response
+adata$response2=revalue(adata$response,c("infection"="RT-PCR",
+                                         "competence"="virus isolation"))
+amean$response2=revalue(amean$response,c("infection"="RT-PCR",
+                                         "competence"="virus isolation"))
+
 ## plot with segments
 set.seed(1)
 f2A=ggplot(adata)+
@@ -110,7 +117,7 @@ f2A=ggplot(adata)+
   geom_line(aes(x=xj,y=auc,group=seed),alpha=0.25)+
   geom_point(aes(x=xj,y=auc),size=1.5,alpha=1)+
   scale_x_continuous(breaks=c(1,2),
-                     labels=levels(adata$response),
+                     labels=levels(adata$response2),
                      limits=c(0.5,2.5))+
   theme_bw()+
   labs(x="response variable",
@@ -231,8 +238,8 @@ f2B=ggplot(ranks2,aes(pcr_rank,comp_rank))+
   scale_x_reverse(limits=c(max(c(ranks2$comp_rank,ranks2$pcr_rank))+4,0))+
   #geom_abline(slope=1,linetype=2,size=0.5)+
   theme_bw()+
-  labs(x="feature rank for infection",
-       y="feature rank for competence")+
+  labs(x="feature rank for RT-PCR",
+       y="feature rank for virus isolation")+
   theme(axis.text=element_text(size=10),
         axis.title=element_text(size=12))+
   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
@@ -529,6 +536,11 @@ apreds2$cat=ifelse(apreds2$studies==0,"unsampled",
 apreds2$cat=factor(apreds2$cat,c("positive",'negative','unsampled'))
 apreds$cat=factor(apreds$cat,levels=levels(apreds2$cat))
 
+## fix type2
+apreds$type2=revalue(apreds$type2,
+                     c("infection"="RT-PCR",
+                       "competence"="virus isolation"))
+
 ## figure 3a
 library(awtools)
 cc=mpalette[2:4] 
@@ -560,8 +572,8 @@ f3A
 f3B=ggplot(apreds2,aes(pred_pcr,pred_comp))+
   geom_point(alpha=0.5,size=2,aes(colour=cat,fill=cat))+
   geom_smooth(method='gam',colour="grey")+
-  labs(x=expression(paste(italic(P),' from infection models')),
-       y=expression(paste(italic(P),' from competence models')))+
+  labs(x=expression(paste(italic(P),' from RT-PCR models')),
+       y=expression(paste(italic(P),' from virus isolation models')))+
   theme_bw()+
   theme(axis.text=element_text(size=10),
         axis.title=element_text(size=12),
@@ -857,14 +869,14 @@ p2=gg+
 ## combine
 f3C=p1+p2
 f3C=ggarrange(p1,p2,
-              labels=c("(B) infection predictions","(C) competence predictions"),
+              labels=c("(B) RT-PCR predictions","(C) virus isolation predictions"),
               label.x=c(-0.03,-0.1),
               label.y=0.1,
               font.label=list(face="plain",size=13))
 
 ## revise fig 3
 setwd("~/Desktop/hantaro/figs")
-png("Figure 3-2.png",width=7,height=7.25,units="in",res=300)
+png("Figure 3.png",width=7,height=7.25,units="in",res=300)
 #f3+f3C+plot_layout(nrow=2,heights=c(1.25,1))
 ggarrange(f3,f3C,nrow=2,heights=c(1.1,1))
 #f3B+f3C+plot_layout(nrow=2,heights=c(1,1.5))
