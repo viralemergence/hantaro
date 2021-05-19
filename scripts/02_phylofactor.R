@@ -241,7 +241,7 @@ library(ggpubr)
 setwd("~/Desktop/hantaro/figs")
 png("Figure 1.png",width=6,height=6,units="in",res=300)
 ggarrange(pcr_gg,comp_gg,ncol=2,widths=c(1.2,1),
-          labels=c("(A) RT-PCR","(B) virus isolation"),
+          labels=c("(a) RT-PCR","(b) virus isolation"),
           label.x=c(-0.1,-0.2),
           font.label=list(face="plain",size=12))
 dev.off()

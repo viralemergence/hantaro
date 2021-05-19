@@ -250,7 +250,7 @@ f2B=ggplot(ranks2,aes(pcr_rank,comp_rank))+
 setwd("~/Desktop/hantaro/figs")
 png("Figure 2.png",width=7,height=3.5,units="in",res=300)
 ggarrange(f2A,f2B,ncol=2,widths=c(1,1),
-          labels=c("(A)","(B)"),
+          labels=c("(a)","(b)"),
           label.x=c(0.21,0.18),
           label.y=0.97,
           font.label=list(face="plain",size=12))
@@ -564,8 +564,8 @@ f3A=ggplot(apreds,aes(cpred))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
   scale_colour_manual(values=cc)+
   scale_fill_manual(values=cc)+
-  guides(colour=guide_legend(title="(A) orthohantavirus positivity"),
-         fill=guide_legend(title="(A) orthohantavirus positivity"))
+  guides(colour=guide_legend(title="(a) orthohantavirus positivity"),
+         fill=guide_legend(title="(a) orthohantavirus positivity"))
 f3A
 
 ## scatterplot
@@ -588,8 +588,8 @@ f3B=ggplot(apreds2,aes(pred_pcr,pred_comp))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
   scale_colour_manual(values=cc)+
   scale_fill_manual(values=cc)+
-  guides(colour=guide_legend(title="(A) orthohantavirus positivity"),
-         fill=guide_legend(title="(A) orthohantavirus positivity"))
+  guides(colour=guide_legend(title="(a) orthohantavirus positivity"),
+         fill=guide_legend(title="(a) orthohantavirus positivity"))
 
 ## combine
 setwd("~/Desktop/hantaro/figs")
@@ -869,7 +869,7 @@ p2=gg+
 ## combine
 f3C=p1+p2
 f3C=ggarrange(p1,p2,
-              labels=c("(B) RT-PCR predictions","(C) virus isolation predictions"),
+              labels=c("(b) RT-PCR predictions","(c) virus isolation predictions"),
               label.x=c(-0.03,-0.1),
               label.y=0.1,
               font.label=list(face="plain",size=13))
