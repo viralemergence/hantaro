@@ -42,6 +42,14 @@ comp_brts=comp_brts[keep]
 mean(c(sapply(pcr_brts,function(x) x$testAUC),sapply(comp_brts,function(x) x$testAUC)))
 se(c(sapply(pcr_brts,function(x) x$testAUC),sapply(comp_brts,function(x) x$testAUC)))
 
+## get net sensitivity
+mean(c(sapply(pcr_brts,function(x) x$sen),sapply(comp_brts,function(x) x$sen)))
+se(c(sapply(pcr_brts,function(x) x$sen),sapply(comp_brts,function(x) x$sen)))
+
+## get net specificity
+mean(c(sapply(pcr_brts,function(x) x$spec),sapply(comp_brts,function(x) x$spec)))
+se(c(sapply(pcr_brts,function(x) x$spec),sapply(comp_brts,function(x) x$spec)))
+
 ## for cites
 mean(sapply(pm_brts,function(x) x$testAUC))
 se(sapply(pm_brts,function(x) x$testAUC))
@@ -55,69 +63,107 @@ se(sapply(pcr_brts,function(x) x$testAUC))
 mean(sapply(comp_brts,function(x) x$testAUC))
 se(sapply(comp_brts,function(x) x$testAUC))
 
-## t test
-n=length(sapply(pcr_brts,function(x) x$testAUC))
-adata=data.frame(auc=c(sapply(pcr_brts,function(x) x$testAUC),
-                       sapply(comp_brts,function(x) x$testAUC)),
-                 response=c(rep('infection',n),rep('competence',n)),
-                 seed=c(sapply(pcr_brts,function(x) x$seed),
-                        sapply(comp_brts,function(x) x$seed)))
-rm(n)
+## function for extracting data, perform unpaired t test, Cohen's d
+tfun=function(measure){
 
-## factor
-adata$response=factor(adata$response,levels=c('infection','competence'))
+  ## format data
+  n=length(sapply(pcr_brts,function(x) x$testAUC))
+  adata=data.frame(y=c(sapply(pcr_brts,function(x) x[measure][[1]]),
+                       sapply(comp_brts,function(x) x[measure][[1]])),
+                   response=c(rep('infection',n),rep('competence',n)),
+                   seed=c(sapply(pcr_brts,function(x) x$seed),
+                          sapply(comp_brts,function(x) x$seed)))
+  rm(n)
+  
+  ## factor
+  adata$response=factor(adata$response,levels=c('infection','competence'))
+  
+  ## make jitter position
+  adata$x=as.numeric(factor(adata$response))
+  set.seed(1)
+  adata$xj=jitter(adata$x,0.5)
+  
+  ## fix response
+  adata$response2=revalue(adata$response,c("infection"="RT-PCR",
+                                           "competence"="virus isolation"))
+  
+  ## t-test
+  tsum=t.test(y~response,data=adata,
+         alternative='two.sided',
+         var.equal=F,paired=F)  
+  
+  ## effect size
+  csum=cohens_d(y~response,data=adata,paired=F,var.equal=F)
+  
+  ## return
+  return(list(adata=adata,tsum=tsum,csum=csum))
+}
 
-## long to wide
-adata2=spread(adata,response,auc)
+## run for AUC
+adata=tfun("testAUC")
 
-## difference
-adata2$diff=adata2$competence-adata2$infection
+## repeat for sensitivity
+mean(sapply(pcr_brts,function(x) x$sen))
+se(sapply(pcr_brts,function(x) x$sen))
+mean(sapply(comp_brts,function(x) x$sen))
+se(sapply(comp_brts,function(x) x$sen))
 
-## paired t test
-summary(lm(diff~1,data=adata2))
+## compare
+sedata=tfun("sen")
 
-## formal test for reporting
-t.test(adata2$infection,adata2$competence,paired=T)
+## repeat for specificity
+mean(sapply(pcr_brts,function(x) x$spec))
+se(sapply(pcr_brts,function(x) x$spec))
+mean(sapply(comp_brts,function(x) x$spec))
+se(sapply(comp_brts,function(x) x$spec))
 
-## t-test
-t.test(auc~response,data=adata,
-       alternative='two.sided',
-       var.equal=F,paired=T)  
+## compare
+spdata=tfun("spec")
 
-## effect size
-cohens_d(auc~response,data=adata,paired=T)
+## aggregate dataset
+data1=sedata$adata
+data2=spdata$adata
 
-## make jitter position
-adata$x=as.numeric(factor(adata$response))
+## types
+data1$type="sensitivity"
+data2$type="specificity"
+sdata=rbind.data.frame(data1,data2)
+rm(data1,data2)
+
+## supplement
+setwd("~/Desktop/hantaro/figs")
+png("Figure S3.png",width=4,height=5,units="in",res=300)
 set.seed(1)
-adata$xj=jitter(adata$x,0.5)
-
-## dataset of means
-amean=data.frame(mean=tapply(adata$auc,adata$response,mean))
-amean$se=tapply(adata$auc,adata$response,se)
-amean$lower=amean$mean-(1.96*amean$se)
-amean$upper=amean$mean+(1.96*amean$se)
-amean$response=rownames(amean)
-
-## x
-amean$response=factor(amean$response,levels=levels(adata$response))
-amean$x=as.numeric(factor(amean$response))
-
-## fix response
-adata$response2=revalue(adata$response,c("infection"="RT-PCR",
-                                         "competence"="virus isolation"))
-amean$response2=revalue(amean$response,c("infection"="RT-PCR",
-                                         "competence"="virus isolation"))
-
-## plot with segments
-set.seed(1)
-f2A=ggplot(adata)+
+ggplot(sdata)+
   #geom_violin(aes(x=x,y=auc,group=x),trim=T,scale="count",width=0.5)+
-  geom_boxplot(aes(x=x,y=auc,group=x),width=0.25,alpha=0.25)+
-  geom_line(aes(x=xj,y=auc,group=seed),alpha=0.25)+
-  geom_point(aes(x=xj,y=auc),size=1.5,alpha=1)+
+  geom_boxplot(aes(x=x,y=y,group=x),width=0.25,alpha=0.25,outlier.alpha=0)+
+  geom_point(aes(x=xj,y=y),size=1.5,alpha=0.5)+
   scale_x_continuous(breaks=c(1,2),
-                     labels=levels(adata$response2),
+                     labels=levels(sdata$response2),
+                     limits=c(0.5,2.5))+
+  theme_bw()+
+  facet_wrap(~type,scales="free_y",strip.position="left",ncol=1)+
+  theme(strip.placement="outside",
+        strip.background=element_blank())+
+  labs(x="response variable",
+       y=NULL)+
+  theme(axis.text.y=element_text(size=10),
+        axis.text.x=element_text(size=12),
+        axis.title=element_text(size=12),
+        strip.text=element_text(size=12))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+  guides(colour=F)
+dev.off()
+
+## plot AUC for main text, t test
+set.seed(1)
+f2A=ggplot(adata$adata)+
+  geom_boxplot(aes(x=x,y=y,group=x),width=0.25,alpha=0.25,outlier.alpha=0)+
+  geom_point(aes(x=xj,y=y),size=1.5,alpha=0.5)+
+  scale_x_continuous(breaks=c(1,2),
+                     labels=levels(adata$adata$response2),
                      limits=c(0.5,2.5))+
   theme_bw()+
   labs(x="response variable",
@@ -128,12 +174,7 @@ f2A=ggplot(adata)+
   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
   theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
-  guides(colour=F)#+
-  
-  ## add mean
-  #geom_line(data=amean,aes(x=x,y=mean),size=1.5)+
-  #geom_segment(data=amean,aes(x=x,xend=x,y=lower,yend=upper),size=1.5)+
-  #geom_point(data=amean,aes(x=x,y=mean),size=3,shape=15)
+  guides(colour=F)
 
 ## relative importance for PCR
 vinf=lapply(pcr_brts,function(x) x$rinf)
@@ -143,17 +184,27 @@ pcr_vinf=do.call(rbind,vinf)
 vinf=lapply(comp_brts,function(x) x$rinf)
 comp_vinf=do.call(rbind,vinf)
 
-## aggregate mean
+## aggregate mean, SE, and var
 vdata_pcr=data.frame(aggregate(rel.inf~var,data=pcr_vinf,mean),
-                     aggregate(rel.inf~var,data=pcr_vinf,se)["rel.inf"])
-names(vdata_pcr)=c("var","rel.inf","rse")
+                     aggregate(rel.inf~var,data=pcr_vinf,se)["rel.inf"],
+                     aggregate(rel.inf~var,data=pcr_vinf,var)["rel.inf"])
+names(vdata_pcr)=c("var","rel.inf","rse","rvar")
 vdata_pcr=vdata_pcr[order(vdata_pcr$rel.inf,decreasing=T),]
 
-## aggregate mean
+## aggregate mean, SE, var
 vdata_comp=data.frame(aggregate(rel.inf~var,data=comp_vinf,mean),
-                      aggregate(rel.inf~var,data=comp_vinf,se)["rel.inf"])
-names(vdata_comp)=c("var","rel.inf","rse")
+                      aggregate(rel.inf~var,data=comp_vinf,se)["rel.inf"],
+                      aggregate(rel.inf~var,data=comp_vinf,var)["rel.inf"])
+names(vdata_comp)=c("var","rel.inf","rse","rvar")
 vdata_comp=vdata_comp[order(vdata_comp$rel.inf,decreasing=T),]
+
+## compare mean var
+mean(vdata_pcr$rvar)
+mean(vdata_comp$rvar)
+
+## compare variance in mean var
+var(vdata_pcr$rel.inf)
+var(vdata_comp$rel.inf)
 
 ## clean
 rm(pcr_vinf,comp_vinf,vinf)
@@ -174,14 +225,14 @@ ranks=merge(vdata_pcr[c("var","pcr_rank","pcr_imp")],
             by="var")
 rm(vdata_comp,vdata_pcr)
 
-## ranks for table S2
-ts2=ranks
-ts2$feature=ts2$var
-ts2=ts2[c("feature","pcr_imp","comp_imp","pcr_rank","comp_rank")]
+## ranks for table S5
+ts5=ranks
+ts5$feature=ts5$var
+ts5=ts5[c("feature","pcr_imp","comp_imp","pcr_rank","comp_rank")]
 
-## Table S2
+## Table S5
 setwd("~/Desktop/hantaro/figs")
-write.csv(ts2,"Table S2.csv")
+write.csv(ts5,"Table S5.csv")
 
 ## correlate
 cor.test(ranks$pcr_rank,ranks$comp_rank,method="spearman")
@@ -457,7 +508,7 @@ c10=pdp_plot(comp_brts,ranks2$var[10])
 ## compile
 library(patchwork)
 setwd("~/Desktop/hantaro/figs")
-png("Figure S1.png",width=4,height=10,units="in",res=300)
+png("Figure S4.png",width=4,height=10,units="in",res=300)
 p1+p2+p3+p4+p5+p6+p7+p8+p9+p10+
   c1+c2+c3+c4+c5+c6+c7+c8+c9+c10+plot_layout(nrow=10,ncol=2,byrow=F)
 dev.off()
@@ -802,7 +853,7 @@ predpfs$other=round(predpfs$other,2)
 
 ## write
 setwd("~/Desktop/hantaro/figs")
-write.csv(predpfs,"Table S3.csv")
+write.csv(predpfs,"Table S6.csv")
 
 ## combine tree and data
 dtree=treeio::full_join(as.treedata(cdata$phy),cdata$data,by="label")

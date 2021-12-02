@@ -1,6 +1,10 @@
 ## hantaro 03: rodent hantavirus BRT
 ## danbeck@ou.edu
+<<<<<<< Updated upstream
 ## updated 12/01/2021
+=======
+## updated 11/30/2021
+>>>>>>> Stashed changes
 
 ## clean environment & plots
 rm(list=ls()) 
