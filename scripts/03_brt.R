@@ -1,5 +1,6 @@
 ## hantaro 03: rodent hantavirus BRT
 ## danbeck@ou.edu
+## updated 12/01/2021
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -20,6 +21,9 @@ library(caper)
 library(phylofactor)
 library(ggtree)
 library(treeio)
+library(caret) 
+library(InformationValue)
+library(mgcv)
 
 ## load files
 setwd("~/Desktop/hantaro/data/clean files")
@@ -28,6 +32,14 @@ data=read.csv('hantaro cleaned response and traits.csv')
 ## classify true negatives
 data$type=ifelse(data$studies>0 & data$hPCR==0 & data$competence==0,"true negative","other")
 
+## tabulate PCR and isolation
+set=data
+set$pcr=ifelse(set$hPCR==0,"PCR negative","PCR positive")
+set$iso=ifelse(set$competence==0,"no isolation","isolation")
+table(set$pcr,set$iso)
+
+## which species is competent but no PCR record?
+set[set$hPCR==0 & set$competence==1,"treename"]
 ## make binary columns for genus
 dums=dummy_cols(data["gen"])
 
@@ -45,6 +57,19 @@ for(i in 1:ncol(dums)){
 ## merge
 data=merge(data,dums,by="gen",all.x=T)
 rm(dums)
+
+## drop unnecessary columns
+data$X=NULL
+data$superres=NULL
+data$Flag=NULL
+data$Zdiv=NULL
+data$References=NULL
+data$WOS_HITS=NULL
+data$traitname=NULL
+data$Rodents=NULL
+data$MSW05_Order=NULL
+data$MSW05_Genus=NULL
+data$MSW05_Species=NULL
 
 ## mode function
 mode.prop <- function(x) {
@@ -81,6 +106,22 @@ mval=data.frame(apply(data,2,function(x) length(x[!is.na(x)])/nrow(data)))
 mval$variables=rownames(mval)
 names(mval)=c("comp","column")
 
+## visualize distribution of NA
+setwd("~/Desktop/hantaro/figs")
+png("Figure S1.png",width=4,height=4,units="in",res=600)
+ggplot(mval[!mval$column%in%c("gen","treename","studies","hPCR","competence","tip","fam"),],
+       aes(comp))+
+  geom_histogram(bins=50)+
+  geom_vline(xintercept=0.25,linetype=2,size=0.5)+
+  theme_bw()+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+  labs(y="frequency",
+       x="trait coverage across muroid rodent species")+
+  scale_x_continuous(labels = scales::percent)
+dev.off()
+
 ## if have at least 25% values, keep
 mval$comp=round(mval$comp,2)
 mval$keep=ifelse(mval$comp>=0.25,"keep","cut")
@@ -93,19 +134,6 @@ mval=mval[order(mval$comp),]
 ## drop if not well represented
 data=data[keeps]
 rm(mval,keeps)
-
-## drop unnecessary columns
-data$X=NULL
-data$superres=NULL
-data$Flag=NULL
-data$Zdiv=NULL
-data$References=NULL
-data$WOS_HITS=NULL
-data$traitname=NULL
-data$Rodents=NULL
-data$MSW05_Order=NULL
-data$MSW05_Genus=NULL
-data$MSW05_Species=NULL
 
 ## make simplified
 set=data
@@ -147,7 +175,243 @@ ts1$comp=NULL
 setwd("~/Desktop/hantaro/figs")
 write.csv(ts1,"Table S1.csv")
 
-## function to use different data partitions
+## hyperparameter tuning ifelse
+hok="ok"
+if(hok!="ok"){
+  
+## hyperparameter grid
+hgrid=expand.grid(n.trees=5000,
+                  interaction.depth=c(2,3,4),
+                  shrinkage=c(0.01,0.001,0.0005),
+                  n.minobsinnode=4,
+                  seed=seq(1,10,by=1))
+
+## fix trees
+hgrid$n.trees=ifelse(hgrid$shrinkage<0.001,hgrid$n.trees*3,hgrid$n.trees)
+
+## trees, depth, shrink, min, prop
+hgrid$id=with(hgrid,paste(n.trees,interaction.depth,shrinkage,n.minobsinnode))
+
+## sort by id then seed
+hgrid=hgrid[order(hgrid$id,hgrid$seed),]
+
+## now add rows
+hgrid$row=1:nrow(hgrid)
+
+## factor id
+hgrid$id2=factor(as.numeric(factor(hgrid$id)))
+
+## function to assess each hyperpar combination
+hfit=function(row,response){
+  
+  ## make new data
+  ndata=set
+  
+  ## correct response
+  ndata$response=ndata[response][,1]
+  
+  ## remove raw
+  ndata$hPCR=NULL
+  ndata$competence=NULL
+  
+  ## use rsample to split
+  set.seed(hgrid$seed[row])
+  split=initial_split(ndata,prop=0.7,strata="response")
+  
+  ## test and train
+  dataTrain=training(split)
+  dataTest=testing(split)
+  
+  ## yTest and yTrain
+  yTrain=dataTrain$response
+  yTest=dataTest$response
+  
+  ## BRT
+  set.seed(1)
+  gbmOut=gbm(response ~ . ,data=dataTrain,
+             n.trees=hgrid$n.trees[row],
+             distribution="bernoulli",
+             shrinkage=hgrid$shrinkage[row],
+             interaction.depth=hgrid$interaction.depth[row],
+             n.minobsinnode=hgrid$n.minobsinnode[row],
+             cv.folds=5,class.stratify.cv=TRUE,
+             bag.fraction=0.5,train.fraction=1,
+             n.cores=1,
+             verbose=F)
+  
+  ## performance
+  par(mfrow=c(1,1),mar=c(4,4,1,1))
+  best.iter=gbm.perf(gbmOut,method="cv")
+  
+  ## predict with test data
+  preds=predict(gbmOut,dataTest,n.trees=best.iter,type="response")
+  
+  ## known
+  result=dataTest$response
+  
+  ## sensitiviy and specificity
+  sen=InformationValue::sensitivity(result,preds)
+  spec=InformationValue::specificity(result,preds)
+  
+  ## AUC on train
+  auc_train=gbm.roc.area(yTrain,predict(gbmOut,dataTrain,n.trees=best.iter,type="response"))
+  
+  ## AUC on test
+  auc_test=gbm.roc.area(yTest,predict(gbmOut,dataTest,n.trees=best.iter,type="response"))
+  
+  ## print
+  print(paste("hpar row ",row," done; test AUC is ",auc_test,sep=""))
+  
+  ## save outputs
+  return(list(best=best.iter,
+              trainAUC=auc_train,
+              testAUC=auc_test,
+              spec=spec,
+              sen=sen,
+              wrow=row))
+}
+
+## run the function
+hpars=lapply(1:nrow(hgrid),function(x) hfit(x,response="hPCR"))
+
+## get results
+hresults=data.frame(sapply(hpars,function(x) x$trainAUC),
+                    sapply(hpars,function(x) x$testAUC),
+                    sapply(hpars,function(x) x$spec),
+                    sapply(hpars,function(x) x$sen),
+                    sapply(hpars,function(x) x$wrow),
+                    sapply(hpars,function(x) x$best))
+names(hresults)=c("trainAUC","testAUC",
+                  "spec","sen","row","best")
+
+## combine and save
+hsearch=merge(hresults,hgrid,by="row")
+
+## save
+hsearch$type="PCR"
+
+## rerun for competence
+hpars=lapply(1:nrow(hgrid),function(x) hfit(x,response="competence"))
+
+## get results
+hresults=data.frame(sapply(hpars,function(x) x$trainAUC),
+                    sapply(hpars,function(x) x$testAUC),
+                    sapply(hpars,function(x) x$spec),
+                    sapply(hpars,function(x) x$sen),
+                    sapply(hpars,function(x) x$wrow),
+                    sapply(hpars,function(x) x$best))
+names(hresults)=c("trainAUC","testAUC",
+                  "spec","sen","row","best")
+
+## combine and save
+csearch=merge(hresults,hgrid,by="row")
+
+## assign data type
+csearch$type="competence"
+
+## combine
+search=rbind.data.frame(csearch,hsearch)
+search$type=factor(search$type,levels=c("PCR","competence"))
+
+## export
+setwd("~/Desktop/hantaro/figs")
+write.csv(search,"par tuning data summary.csv")
+
+}else{
+  
+## load
+setwd("~/Desktop/hantaro/figs")
+search=read.csv("par tuning data summary.csv")
+  
+}
+
+## factor parameters
+search$shrinkage=factor(search$shrinkage)
+lvl=rev(sort(unique(search$shrinkage)))
+search$shrinkage=factor(search$shrinkage,levels=lvl); rm(lvl)
+
+## factor other
+search$interaction.depth=factor(search$interaction.depth)
+
+## PCR beta regression for AUC
+mod=gam(testAUC~interaction.depth*shrinkage,
+        data=search[search$type=="PCR",],method="REML",family=betar)
+anova(mod)
+
+## virus isolation
+mod=gam(testAUC~interaction.depth*shrinkage,
+        data=search[search$type=="competence",],method="REML",family=betar)
+anova(mod)
+
+## PCR beta regression for sensitivity
+mod=gam(sen~interaction.depth*shrinkage,
+            data=search[search$type=="PCR",],method="REML",family=betar)
+anova(mod)
+
+## virus isolation
+mod=gam(sen~interaction.depth*shrinkage,
+        data=search[search$type=="competence",],method="REML",family=betar)
+anova(mod)
+
+## PCR beta regression for specificity
+mod=gam(spec~interaction.depth*shrinkage,
+        data=search[search$type=="PCR",],method="REML",family=betar)
+anova(mod)
+
+## virus isolation
+mod=gam(spec~interaction.depth*shrinkage,
+        data=search[search$type=="competence",],method="REML",family=betar)
+anova(mod)
+
+## fix type
+search$type=plyr::revalue(search$type,
+                    c("PCR"="RT-PCR",
+                      "competence"="virus isolation"))
+
+## recast from wide to long
+search2=gather(search,measure,value,testAUC:sen)
+
+## revalue and factor
+search2$measure=plyr::revalue(search2$measure,
+                              c("sen"="sensitivity",
+                                "spec"="specificity",
+                                "testAUC"="test AUC"))
+search2$measure=factor(search2$measure,
+                       levels=c("test AUC","sensitivity","specificity"))
+
+## visualize
+setwd("~/Desktop/hantaro/figs")
+png("Figure S2.png",width=5,height=8,units="in",res=600)
+set.seed(1)
+ggplot(search2,aes(shrinkage,value,
+                   colour=interaction.depth,fill=interaction.depth))+
+  geom_boxplot(alpha=0.25)+
+  geom_point(alpha=0.75,
+             position = position_jitterdodge(dodge.width=0.75))+
+  theme_bw()+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))+
+  facet_grid(measure~type,scales="free_y",switch="y")+
+  theme(strip.placement="outside",
+        strip.background=element_blank())+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=12),
+        strip.text=element_text(size=12))+
+  theme(legend.position="top")+
+  scale_color_brewer(palette="Pastel2")+
+  scale_fill_brewer(palette="Pastel2")+
+  guides(colour=guide_legend(title="interaction depth"),
+         fill=guide_legend(title="interaction depth"))+
+  labs(y=NULL,
+       x="learning rate")+
+  scale_y_continuous(n.breaks=4)
+dev.off()
+
+## clean
+rm(search,search2,hok,mod)
+
+## brt function to use different data partitions
 brt_part=function(seed,response){
   
   ## make new data
@@ -210,6 +474,13 @@ brt_part=function(seed,response){
   ## predict with test data
   preds=predict(gbmOut,dataTest,n.trees=best.iter,type="response")
   
+  ## known
+  result=dataTest$response
+  
+  ## sensitiviy and specificity
+  sen=InformationValue::sensitivity(result,preds)
+  spec=InformationValue::specificity(result,preds)
+  
   ## AUC on train
   auc_train=gbm.roc.area(yTrain,predict(gbmOut,dataTrain,n.trees=best.iter,type="response"))
   
@@ -267,6 +538,8 @@ brt_part=function(seed,response){
               best=best.iter,
               trainAUC=auc_train,
               testAUC=auc_test,
+              spec=spec,
+              sen=sen,
               roc=perf,
               rinf=bars,
               predict=pred_data,
