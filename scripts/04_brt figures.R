@@ -120,6 +120,12 @@ se(sapply(comp_brts,function(x) x$spec))
 ## compare
 spdata=tfun("spec")
 
+## adjust p values
+ps=c(adata$tsum$p.value,
+     sedata$tsum$p.value,
+     spdata$tsum$p.value)
+round(p.adjust(ps,method="BH"),4)
+
 ## aggregate dataset
 data1=sedata$adata
 data2=spdata$adata
@@ -692,8 +698,8 @@ comp_lmod=pgls(pred_comp~1,data=cdata,lambda="ML")
 summary(pcr_lmod)
 summary(comp_lmod)
 # moderate phylogenetic signal in predictions
-## pcr = 0.619
-## comp = 0.55
+## pcr = 0.63
+## comp = 0.57
 
 ## taxonomy
 cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
@@ -828,13 +834,13 @@ pcols=afun(2)
 set.seed(1)
 pcrpred_pf=gpf(Data=cdata$data,tree=cdata$phy,
             frmla.phylo=pred_pcr~phylo,
-            family=gaussian,algorithm='phylo',nfactors=6,min.group.size=5)
+            family=gaussian,algorithm='phylo',nfactors=7,min.group.size=5)
 
 ## comp predictions
 set.seed(1)
 comppred_pf=gpf(Data=cdata$data,tree=cdata$phy,
                frmla.phylo=pred_comp~phylo,
-               family=gaussian,algorithm='phylo',nfactors=7,min.group.size=5)
+               family=gaussian,algorithm='phylo',nfactors=4,min.group.size=5)
 
 ## summarize
 pcrpred_pf_results=pfsum(pcrpred_pf)$results
@@ -906,7 +912,7 @@ for(i in 1:nrow(comppred_pf_results)){
   
   gg=gg+
     geom_hilight(node=comppred_pf_results$node[i],
-                 alpha=ifelse(comppred_pf_results$tips[i]/Ntip(cdata$phy)<0.5,0.5,0.15),
+                 alpha=ifelse(comppred_pf_results$tips[i]/Ntip(cdata$phy)<0.5,0.5,0.25),
                  fill="black")
 }
 

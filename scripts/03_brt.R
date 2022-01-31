@@ -1,6 +1,6 @@
 ## hantaro 03: rodent hantavirus BRT
 ## danbeck@ou.edu
-## updated 12/01/2021
+## updated 01/30/2022
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -40,6 +40,7 @@ table(set$pcr,set$iso)
 
 ## which species is competent but no PCR record?
 set[set$hPCR==0 & set$competence==1,"treename"]
+
 ## make binary columns for genus
 dums=dummy_cols(data["gen"])
 
@@ -112,7 +113,7 @@ png("Figure S1.png",width=4,height=4,units="in",res=600)
 ggplot(mval[!mval$column%in%c("gen","treename","studies","hPCR","competence","tip","fam"),],
        aes(comp))+
   geom_histogram(bins=50)+
-  geom_vline(xintercept=0.25,linetype=2,size=0.5)+
+  geom_vline(xintercept=0.70,linetype=2,size=0.5)+
   theme_bw()+
   theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
   theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
@@ -122,9 +123,10 @@ ggplot(mval[!mval$column%in%c("gen","treename","studies","hPCR","competence","ti
   scale_x_continuous(labels = scales::percent)
 dev.off()
 
-## if have at least 25% values, keep
+## changed 25% to 70%
 mval$comp=round(mval$comp,2)
-mval$keep=ifelse(mval$comp>=0.25,"keep","cut")
+mval$keep=ifelse(mval$comp>=0.70,"keep","cut")
+table(mval$keep)
 mval=mval[order(mval$keep),]
 keeps=mval[-which(mval$keep=="cut"),]$column
 
@@ -333,40 +335,40 @@ search$shrinkage=factor(search$shrinkage,levels=lvl); rm(lvl)
 ## factor other
 search$interaction.depth=factor(search$interaction.depth)
 
+## fix type
+search$type=plyr::revalue(search$type,
+                          c("PCR"="RT-PCR",
+                            "competence"="virus isolation"))
+
 ## PCR beta regression for AUC
 mod=gam(testAUC~interaction.depth*shrinkage,
-        data=search[search$type=="PCR",],method="REML",family=betar)
+        data=search[search$type=="RT-PCR",],method="REML",family=betar)
 anova(mod)
 
 ## virus isolation
 mod=gam(testAUC~interaction.depth*shrinkage,
-        data=search[search$type=="competence",],method="REML",family=betar)
+        data=search[search$type=="virus isolation",],method="REML",family=betar)
 anova(mod)
 
 ## PCR beta regression for sensitivity
 mod=gam(sen~interaction.depth*shrinkage,
-            data=search[search$type=="PCR",],method="REML",family=betar)
+            data=search[search$type=="RT-PCR",],method="REML",family=betar)
 anova(mod)
 
 ## virus isolation
 mod=gam(sen~interaction.depth*shrinkage,
-        data=search[search$type=="competence",],method="REML",family=betar)
+        data=search[search$type=="virus isolation",],method="REML",family=betar)
 anova(mod)
 
 ## PCR beta regression for specificity
 mod=gam(spec~interaction.depth*shrinkage,
-        data=search[search$type=="PCR",],method="REML",family=betar)
+        data=search[search$type=="RT-PCR",],method="REML",family=betar)
 anova(mod)
 
 ## virus isolation
 mod=gam(spec~interaction.depth*shrinkage,
-        data=search[search$type=="competence",],method="REML",family=betar)
+        data=search[search$type=="virus isolation",],method="REML",family=betar)
 anova(mod)
-
-## fix type
-search$type=plyr::revalue(search$type,
-                    c("PCR"="RT-PCR",
-                      "competence"="virus isolation"))
 
 ## recast from wide to long
 search2=gather(search,measure,value,testAUC:sen)
