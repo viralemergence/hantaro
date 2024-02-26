@@ -14,7 +14,7 @@ library(treeio)
 library(ggtree)
 
 ## load files
-setwd("~/Desktop/hantaro/data/clean files")
+setwd("~/Desktop/Github/hantaro/data/clean files")
 data=read.csv('hantaro cleaned response and traits.csv')
 rtree=readRDS('rodent phylo trim.rds')
 
@@ -203,8 +203,8 @@ plus=1
 pplus=plus+1
 
 ## fix taxa
-pcr_pf_results$taxa[1]="italic(Oligoryzomys)"
-pcr_pf_results$taxa[2]="subclade~of~italic(Peromyscus)"
+pcr_pf_results$taxa[1]="subclade~of~italic(Peromyscus)"
+pcr_pf_results$taxa[2]="italic(Oligoryzomys)"
 
 ## ggtree
 gg=ggtree(dtree,size=0.25)+
@@ -238,7 +238,7 @@ comp_gg=ggtree(dtree,size=0.25)+
 
 ## print
 library(ggpubr)
-setwd("~/Desktop/hantaro/figs")
+setwd("~/Desktop/Github/hantaro/figs")
 png("Figure 1.png",width=6,height=6,units="in",res=300)
 ggarrange(pcr_gg,comp_gg,ncol=2,widths=c(1.2,1),
           labels=c("(a) RT-PCR","(b) virus isolation"),
